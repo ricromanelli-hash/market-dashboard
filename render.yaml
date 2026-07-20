@@ -1,0 +1,15 @@
+# Blueprint do Render — permite subir o serviço em 1 clique ("New +" > "Blueprint").
+# Também dá para criar manualmente um "Web Service" apontando para este repo
+# (buildCommand e startCommand abaixo são os mesmos usados na criação manual).
+services:
+  - type: web
+    name: market-dashboard
+    env: node
+    plan: free
+    region: oregon
+    buildCommand: npm install
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 22.14.0

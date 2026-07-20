@@ -1,0 +1,257 @@
+:root {
+  --green-dark: #1a4d3d;
+  --green-header: #1f5c3f;
+  --green-up: #1a7f37;
+  --red-down: #c62828;
+  --gray-flat: #757575;
+  --border: #e2e5e0;
+  --bg: #f4f6f4;
+  --card-bg: #ffffff;
+  --text: #1b1f1c;
+  --text-muted: #6b7168;
+  --symbol-color: #4a6a8a;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 20px 28px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--card-bg);
+}
+
+.topbar h1 {
+  margin: 0 0 4px;
+  font-size: 24px;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+}
+
+.updated-at {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+#refreshBtn {
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+#refreshBtn:hover { background: #f0f2f0; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  padding: 20px;
+  align-items: start;
+}
+
+.loading {
+  color: var(--text-muted);
+  padding: 20px;
+}
+
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.card-header {
+  background: var(--green-header);
+  color: #fff;
+  font-weight: 600;
+  font-size: 13.5px;
+  text-align: center;
+  padding: 8px 10px;
+}
+
+.card-header.news-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.news-toggle {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.news-toggle button {
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: transparent;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.news-toggle button.active {
+  background: #fff;
+  color: var(--green-header);
+}
+
+.cal-date {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--green-header);
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
+.cal-footer {
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  border-top: 1px solid #f0f2ef;
+}
+
+.cal-footer a { color: var(--symbol-color); }
+
+/* faixa do widget do Investing.com, fora do grid (não recarrega no refresh) */
+.cal-band {
+  padding: 0 20px;
+  margin-top: 20px;
+}
+
+.cal-widget-card { overflow: hidden; }
+
+.cal-widget-wrap {
+  overflow-x: auto;           /* rola na horizontal em telas estreitas */
+  -webkit-overflow-scrolling: touch;
+}
+
+.cal-widget-wrap iframe {
+  display: block;
+  width: 650px;
+  max-width: none;
+  height: 467px;
+  border: 0;
+}
+
+.card-body { padding: 4px 0; }
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid #f0f2ef;
+  font-size: 13.5px;
+  gap: 8px;
+}
+
+.row:last-child { border-bottom: none; }
+
+.row-label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.row-name { font-weight: 600; }
+
+.row-symbol {
+  font-size: 11px;
+  color: var(--symbol-color);
+}
+
+.row-values {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.row-price { font-weight: 600; }
+
+.row-change {
+  font-size: 12.5px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.row-change.up { color: var(--green-up); }
+.row-change.down { color: var(--red-down); }
+.row-change.flat { color: var(--gray-flat); }
+
+.row-unavailable {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.news-item {
+  padding: 8px 12px;
+  border-bottom: 1px solid #f0f2ef;
+  font-size: 12.5px;
+}
+
+.news-item:last-child { border-bottom: none; }
+
+.news-item a {
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.news-item a:hover { text-decoration: underline; }
+
+.news-date {
+  display: block;
+  color: var(--text-muted);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.notice-card .card-body {
+  padding: 12px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.notice-card a { color: var(--symbol-color); }
+
+.errors-bar {
+  grid-column: 1 / -1;
+  background: #fff4e5;
+  border: 1px solid #ffd8a8;
+  color: #8a5300;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+}

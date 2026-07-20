@@ -1,0 +1,17 @@
+{
+  "name": "market-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dashboard de mercado (indices, Brasil, commodities, setores B3, IPCA, Tesouro Direto e noticias), atualizado a cada 30s.",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "fast-xml-parser": "^4.4.1"
+  }
+}
