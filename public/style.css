@@ -255,3 +255,83 @@ body {
   padding: 8px 12px;
   font-size: 12px;
 }
+
+/* ============================================================
+   MODO TV (?tv=1) — palco fixo 1920x1080 escalado para caber
+   ============================================================ */
+body.tv-mode {
+  background: #0d1512;
+  overflow: hidden;      /* nunca rola */
+  height: 100vh;
+}
+
+/* palco de tamanho fixo; o JS aplica transform: scale(...) para caber na tela */
+body.tv-mode #stage {
+  width: 1920px;
+  height: 1080px;
+  transform-origin: top left;
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 10px 14px 6px;
+  overflow: hidden;
+}
+
+/* topo compacto */
+body.tv-mode .topbar {
+  padding: 4px 6px 8px;
+  border-bottom: none;
+  background: transparent;
+}
+body.tv-mode .topbar h1 { font-size: 22px; color: #eafff5; }
+body.tv-mode .subtitle { font-size: 11px; color: #9fb3aa; }
+body.tv-mode .updated-at { font-size: 12px; color: #cfe; }
+body.tv-mode #refreshBtn { display: none; }
+
+/* layout denso: colunas masonry preenchidas de cima a baixo */
+body.tv-mode .grid {
+  display: block;
+  column-count: 7;
+  column-gap: 9px;
+  padding: 0;
+}
+/* no modo TV o iframe grande do Investing é ocultado (a Agenda IBGE cobre o calendário) */
+body.tv-mode .cal-band { display: none; }
+
+/* notícias em linha única para não estourar a altura */
+body.tv-mode .news-item a {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+body.tv-mode .card {
+  break-inside: avoid;
+  margin: 0 0 10px;
+  border-color: #24352e;
+}
+
+/* tamanhos calibrados para leitura de longe, preenchendo a tela de 1080p */
+body.tv-mode .card-header { font-size: 14.5px; padding: 5px 9px; }
+body.tv-mode .row { padding: 5px 9px; font-size: 14px; }
+body.tv-mode .row-name { font-weight: 600; }
+body.tv-mode .row-symbol { font-size: 10.5px; }
+body.tv-mode .row-change { font-size: 13px; }
+body.tv-mode .news-item { padding: 5px 9px; font-size: 12.5px; }
+body.tv-mode .news-date { font-size: 10.5px; }
+body.tv-mode .cal-date { font-size: 13px; }
+body.tv-mode .cal-footer { padding: 4px 8px; font-size: 9px; }
+
+/* calendário do Investing menor, encaixando numa coluna */
+body.tv-mode .cal-widget-card { break-inside: avoid; }
+body.tv-mode .cal-widget-wrap {
+  height: 300px;
+  overflow: hidden;
+}
+body.tv-mode .cal-widget-wrap iframe {
+  width: 640px;
+  height: 468px;
+  transform: scale(0.49);
+  transform-origin: top left;
+}

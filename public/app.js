@@ -246,6 +246,27 @@ grid.addEventListener('click', (e) => {
   if (lastData) render(lastData);
 });
 
-ensureCalendarWidget(); // monta o iframe do Investing uma vez, fora do ciclo de refresh
+// ---- Modo TV (?tv=1): palco fixo 1920x1080 escalado para caber na tela ----
+const TV_MODE = new URLSearchParams(location.search).get('tv') === '1';
+const STAGE_W = 1920;
+const STAGE_H = 1080;
+
+function fitStage() {
+  const stage = document.getElementById('stage');
+  if (!stage) return;
+  const scale = Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H);
+  // centraliza o palco escalado
+  const left = (window.innerWidth - STAGE_W * scale) / 2;
+  const top = (window.innerHeight - STAGE_H * scale) / 2;
+  stage.style.transform = `translate(${left}px, ${top}px) scale(${scale})`;
+}
+
+if (TV_MODE) {
+  document.body.classList.add('tv-mode');
+  fitStage();
+  window.addEventListener('resize', fitStage);
+}
+
+if (!TV_MODE) ensureCalendarWidget(); // no modo TV o iframe fica oculto, então nem monta
 loadData();
 setInterval(loadData, 30_000);

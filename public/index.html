@@ -7,20 +7,22 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="topbar">
-    <div>
-      <h1>Market Dashboard</h1>
-      <p class="subtitle">Cotações via Yahoo Finance · Juros via BCB (SGS) · Tesouro via Tesouro Transparente · Notícias via InfoMoney &amp; Money Times · atualiza a cada 30s</p>
-    </div>
-    <div class="topbar-actions">
-      <span id="updatedAt" class="updated-at">Atualizado às —</span>
-      <button id="refreshBtn">↻ Atualizar</button>
-    </div>
-  </header>
-  <section id="calWidget" class="cal-band"></section>
-  <main id="grid" class="grid">
-    <p class="loading">Carregando dados…</p>
-  </main>
+  <div id="stage">
+    <header class="topbar">
+      <div>
+        <h1>Market Dashboard</h1>
+        <p class="subtitle">Cotações via Yahoo Finance · Juros via BCB (SGS) · Tesouro via Tesouro Transparente · Notícias via InfoMoney &amp; Money Times · atualiza a cada 30s</p>
+      </div>
+      <div class="topbar-actions">
+        <span id="updatedAt" class="updated-at">Atualizado às —</span>
+        <button id="refreshBtn">↻ Atualizar</button>
+      </div>
+    </header>
+    <section id="calWidget" class="cal-band"></section>
+    <main id="grid" class="grid">
+      <p class="loading">Carregando dados…</p>
+    </main>
+  </div>
   <script src="app.js"></script>
 </body>
 </html>
