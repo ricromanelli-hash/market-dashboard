@@ -113,18 +113,20 @@ function renderNewsItems(news, emptyMsg = 'carregando…') {
     </div>`).join('') || `<p class="row-unavailable" style="padding:12px">${emptyMsg}</p>`;
 }
 
-function renderNewsCard(news, title = 'Notícias') {
+function renderNewsCard(news, title = 'Notícias', limit) {
+  const list = limit ? (news || []).slice(0, limit) : news;
   return `
     <section class="card">
       <div class="card-header">${title}</div>
-      <div class="card-body">${renderNewsItems(news)}</div>
+      <div class="card-body">${renderNewsItems(list)}</div>
     </section>`;
 }
 
 // Card de notícias com filtro "Todas / Minhas empresas".
-function renderMainNewsCard(data) {
+function renderMainNewsCard(data, limit) {
   const showCompany = newsFilter === 'company';
-  const list = showCompany ? data.companyNews : data.news;
+  let list = showCompany ? data.companyNews : data.news;
+  if (limit) list = (list || []).slice(0, limit);
   const emptyMsg = showCompany
     ? 'Nenhuma notícia recente sobre as empresas que você acompanha.'
     : 'carregando…';
@@ -216,9 +218,18 @@ function render(data) {
   }
 
   if (groupTitles.includes('Commodities')) cards.push(renderGroupCard('Commodities', data.groups['Commodities']));
-  cards.push(renderCalendarCard(data.calendar));
-  cards.push(renderNewsCard(data.macroNews, 'Notícias — Indicadores Macro'));
-  cards.push(renderMainNewsCard(data));
+
+  // No modo TV a Agenda IBGE e o calendário do Investing ficam colados: o slot só
+  // reserva o espaço (o iframe real é sobreposto por positionCalWidget, sem recarregar).
+  if (TV_MODE) {
+    cards.push(`<div class="cal-group">${renderCalendarCard(data.calendar)}<div id="calSlot" class="cal-slot"></div></div>`);
+  } else {
+    cards.push(renderCalendarCard(data.calendar));
+  }
+
+  const newsLimit = TV_MODE ? TV_NEWS_LIMIT : undefined;
+  cards.push(renderNewsCard(data.macroNews, 'Notícias — Indicadores Macro', newsLimit));
+  cards.push(renderMainNewsCard(data, newsLimit));
 
   for (const title of groupTitles) {
     if (['Estados Unidos', 'Brasil', 'Commodities'].includes(title)) continue;
@@ -230,6 +241,9 @@ function render(data) {
   }
 
   grid.innerHTML = cards.join('');
+
+  // o grid foi reconstruído: realinha o calendário sobre o novo slot
+  if (TV_MODE) positionCalWidget();
 
   if (data.updatedAt) {
     updatedAtEl.textContent = `Atualizado às ${timeFmt.format(new Date(data.updatedAt))}`;
@@ -250,6 +264,9 @@ grid.addEventListener('click', (e) => {
 const TV_MODE = new URLSearchParams(location.search).get('tv') === '1';
 const STAGE_W = 1920;
 const STAGE_H = 1080;
+const TV_NEWS_LIMIT = 5;        // menos manchetes na TV, porém com o título inteiro
+const CAL_IFRAME_W = 650;       // dimensões nativas do widget do Investing
+const CAL_IFRAME_H = 467;
 
 function fitStage() {
   const stage = document.getElementById('stage');
@@ -259,6 +276,31 @@ function fitStage() {
   const left = (window.innerWidth - STAGE_W * scale) / 2;
   const top = (window.innerHeight - STAGE_H * scale) / 2;
   stage.style.transform = `translate(${left}px, ${top}px) scale(${scale})`;
+  if (TV_MODE) positionCalWidget();
+}
+
+// Sobrepõe o calendário do Investing exatamente sobre o slot reservado no grid.
+// Mover o iframe no DOM o recarregaria; por isso ele fica fixo em #calWidget (filho
+// de #stage) e apenas reposicionamos via top/left — o iframe nunca é recriado.
+function positionCalWidget() {
+  const host = document.getElementById('calWidget');
+  const slot = document.getElementById('calSlot');
+  if (!host || !slot) return;
+  const iframe = host.querySelector('iframe');
+  const wrap = host.querySelector('.cal-widget-wrap');
+  if (!iframe || !wrap) return;
+
+  // 1) escala o iframe para a largura da coluna e reserva a altura correspondente
+  const colW = slot.offsetWidth || host.offsetWidth;
+  const scale = colW / CAL_IFRAME_W;
+  iframe.style.transform = `scale(${scale})`;
+  wrap.style.height = `${Math.round(CAL_IFRAME_H * scale)}px`;
+  host.style.width = `${colW}px`;
+
+  // 2) o slot reserva no fluxo a altura real do card, e então alinhamos por cima
+  slot.style.height = `${host.offsetHeight}px`;
+  host.style.top = `${slot.offsetTop}px`;
+  host.style.left = `${slot.offsetLeft}px`;
 }
 
 if (TV_MODE) {
@@ -267,6 +309,6 @@ if (TV_MODE) {
   window.addEventListener('resize', fitStage);
 }
 
-if (!TV_MODE) ensureCalendarWidget(); // no modo TV o iframe fica oculto, então nem monta
+ensureCalendarWidget(); // o iframe é montado uma vez nos dois modos
 loadData();
 setInterval(loadData, 30_000);

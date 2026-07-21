@@ -60,6 +60,10 @@ const GROUPS = [
     { symbol: 'CSMG3.SA', label: 'Copasa' },
     { symbol: 'SBSP3.SA', label: 'Sabesp' },
   ]},
+  { title: 'Telecom', items: [
+    { symbol: 'VIVT3.SA', label: 'Vivo' },
+    { symbol: 'TIMS3.SA', label: 'TIM' },
+  ]},
   { title: 'Mineração', items: [
     { symbol: 'VALE3.SA', label: 'VALE' },
     { symbol: 'BRAP4.SA', label: 'Bradespar' },
@@ -79,10 +83,6 @@ const GROUPS = [
     { symbol: 'CSNA3.SA', label: 'CSN' },
     { symbol: 'GGBR4.SA', label: 'Gerdau (Metalúrgica)' },
     { symbol: 'GOAU4.SA', label: 'Gerdau (Holding)' },
-  ]},
-  { title: 'Telecom', items: [
-    { symbol: 'VIVT3.SA', label: 'Vivo' },
-    { symbol: 'TIMS3.SA', label: 'TIM' },
   ]},
   { title: 'Químicos & Petroquímicos', items: [
     { symbol: 'UNIP6.SA', label: 'Unipar' },

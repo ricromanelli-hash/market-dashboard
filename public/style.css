@@ -295,16 +295,20 @@ body.tv-mode .grid {
   column-gap: 9px;
   padding: 0;
 }
-/* no modo TV o iframe grande do Investing é ocultado (a Agenda IBGE cobre o calendário) */
-body.tv-mode .cal-band { display: none; }
-
-/* notícias em linha única para não estourar a altura */
-body.tv-mode .news-item a {
-  display: block;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* o calendário do Investing é sobreposto ao slot reservado logo abaixo da Agenda IBGE
+   (posicionado por positionCalWidget); fica fora do #grid para não recarregar no refresh */
+body.tv-mode .cal-band {
+  position: absolute;
+  padding: 0;
+  margin: 0;
 }
+
+/* Agenda IBGE + slot do calendário nunca se separam ao quebrar coluna */
+body.tv-mode .cal-group { break-inside: avoid; }
+body.tv-mode .cal-group .card { margin-bottom: 10px; }
+
+/* espaço reservado no fluxo; a altura é definida via JS */
+body.tv-mode .cal-slot { margin: 0 0 10px; }
 
 body.tv-mode .card {
   break-inside: avoid;
@@ -323,15 +327,12 @@ body.tv-mode .news-date { font-size: 10.5px; }
 body.tv-mode .cal-date { font-size: 13px; }
 body.tv-mode .cal-footer { padding: 4px 8px; font-size: 9px; }
 
-/* calendário do Investing menor, encaixando numa coluna */
-body.tv-mode .cal-widget-card { break-inside: avoid; }
-body.tv-mode .cal-widget-wrap {
-  height: 300px;
-  overflow: hidden;
-}
+/* calendário do Investing encaixado na largura da coluna
+   (escala do iframe e altura do wrap são calculadas em positionCalWidget) */
+body.tv-mode .cal-widget-card { margin: 0; }
+body.tv-mode .cal-widget-wrap { overflow: hidden; }
 body.tv-mode .cal-widget-wrap iframe {
-  width: 640px;
-  height: 468px;
-  transform: scale(0.49);
+  width: 650px;
+  height: 467px;
   transform-origin: top left;
 }
