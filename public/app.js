@@ -154,7 +154,7 @@ function renderRealRatesCard(rows) {
     return `<section class="card"><div class="card-header">Juros Reais</div>
       <div class="card-body"><p class="row-unavailable" style="padding:12px">carregando…</p></div></section>`;
   }
-  const head = `<div class="rr-row rr-head"><span class="rr-flag"></span><span class="rr-pais">País</span><span>Taxa</span><span>Infl.</span><span title="título de 10 anos">10a</span><span title="título de 30 anos (só EUA tem série pública)">30a</span><span>Real</span></div>`;
+  const head = `<div class="rr-row rr-head"><span class="rr-flag"></span><span class="rr-pais">País</span><span title="taxa básica de juros do banco central">Selic</span><span>Infl.</span><span title="título de 10 anos">10a</span><span title="título de 30 anos (só EUA tem série pública)">30a</span><span>Real</span></div>`;
   const num = (v) => (typeof v === 'number' ? v.toFixed(2) : '—');
   const body = rows.map((r) => {
     if (r.unavailable) {
@@ -311,46 +311,17 @@ function ensureCalendarWidget() {
     </section>`;
 }
 
-// Widget de taxas de juros do Investing.com (108x146 nativo). Mesmo esquema do
-// calendário: montado uma vez fora do #grid e sobreposto ao slot correspondente.
-const INVESTING_RATES_SRC = 'https://sslirates.investing.com/index.php?rows=1&bg1=FFFFFF&bg2=F1F5F8&text_color=333333&enable_border=show&border_color=0452A1&header_bg=0452A1&header_text=FFFFFF&force_lang=12';
-const RATES_IFRAME_W = 108;
-const RATES_IFRAME_H = 146;
-const RATES_MAX_SCALE = 1.0; // esticar até a coluna deixaria o card alto demais
-
-function ensureRatesWidget() {
-  const host = document.getElementById('ratesWidget');
-  if (!host || host.dataset.mounted) return;
-  host.dataset.mounted = '1';
-  host.innerHTML = `
-    <section class="card rates-widget-card">
-      <div class="card-header">Taxas de Juros</div>
-      <div class="rates-widget-wrap">
-        <iframe title="Taxas de Juros — Investing.com" src="${INVESTING_RATES_SRC}"
-          width="${RATES_IFRAME_W}" height="${RATES_IFRAME_H}" frameborder="0"
-          scrolling="no" allowtransparency="true" marginwidth="0" marginheight="0"></iframe>
-      </div>
-      <div class="cal-footer">
-        Taxas fornecidas por
-        <a href="https://br.investing.com/" rel="nofollow" target="_blank">Investing.com Brasil</a>.
-      </div>
-    </section>`;
-}
-
-// Sobrepõe um widget persistente ao seu slot no grid, escalando-o para a largura da
-// coluna. `maxScale` evita que widgets estreitos e altos (como o de taxas) fiquem
-// altos demais ao esticar; nesse caso o iframe é centralizado na coluna.
-function positionWidget(hostId, slotId, nativeW, nativeH, maxScale = Infinity) {
+// Sobrepõe um widget persistente ao seu slot no grid, escalando-o para a largura da coluna.
+function positionWidget(hostId, slotId, nativeW, nativeH) {
   const host = document.getElementById(hostId);
   const slot = document.getElementById(slotId);
   if (!host || !slot) return;
   const iframe = host.querySelector('iframe');
-  const wrap = host.querySelector('.cal-widget-wrap, .rates-widget-wrap');
+  const wrap = host.querySelector('.cal-widget-wrap');
   if (!iframe || !wrap) return;
   const colW = slot.offsetWidth || host.offsetWidth;
-  const scale = Math.min(colW / nativeW, maxScale);
-  const offsetX = Math.max(0, (colW - nativeW * scale) / 2); // centraliza se sobrar espaço
-  iframe.style.transform = `translateX(${offsetX}px) scale(${scale})`;
+  const scale = colW / nativeW;
+  iframe.style.transform = `scale(${scale})`;
   wrap.style.height = `${Math.round(nativeH * scale)}px`;
   host.style.width = `${colW}px`;
   slot.style.height = `${host.offsetHeight}px`;
@@ -378,7 +349,6 @@ function cardBuilders(data) {
     'Brasil': () => renderGroupCard('Brasil', g['Brasil'], renderBrasilRatesRows(data.brasilRates)),
     'IndicesMundiais': () => renderWorldIndicesCard(data.worldIndices),
     'JurosReais': () => renderRealRatesCard(data.realRates),
-    'TaxasJuros': () => '<div id="ratesSlot" class="rates-slot"></div>',
     'AgendaIBGE': () => renderCalendarCard(data.calendar, TV_MODE ? TV_AGENDA_LIMIT : undefined),
     'CalendarioEconomico': () => '<div id="calSlot" class="cal-slot"></div>',
     'NoticiasMacro': () => renderNewsCard(data.macroNews, 'Notícias — Indicadores Macro', newsLimit),
@@ -395,7 +365,7 @@ function cardBuilders(data) {
 // A última coluna é mais larga para acomodar o calendário do Investing.
 const TV_LAYOUT = [
   ['Estados Unidos', 'Brasil'],
-  ['Commodities', 'IndicesMundiais', 'TaxasJuros', 'JurosReais'],
+  ['Commodities', 'IndicesMundiais', 'JurosReais'],
   ['Bancos', 'Energia', 'Seguros', 'Saneamento', 'Telecom'],
   ['Mineração', 'Petróleo & Gás', 'Papel & Celulose', 'Metalurgia & Siderurgia', 'Químicos & Petroquímicos'],
   ['AgendaIBGE', 'CalendarioEconomico', 'NoticiasMacro', 'NoticiasEmpresas'],
@@ -469,7 +439,6 @@ function fitStage() {
 // de #stage) e apenas reposicionamos via top/left — o iframe nunca é recriado.
 function positionCalWidget() {
   positionWidget('calWidget', 'calSlot', CAL_IFRAME_W, CAL_IFRAME_H);
-  positionWidget('ratesWidget', 'ratesSlot', RATES_IFRAME_W, RATES_IFRAME_H, RATES_MAX_SCALE);
 }
 
 if (TV_MODE) {
@@ -478,7 +447,6 @@ if (TV_MODE) {
   window.addEventListener('resize', fitStage);
 }
 
-ensureCalendarWidget(); // os iframes são montados uma vez nos dois modos
-ensureRatesWidget();
+ensureCalendarWidget(); // o iframe é montado uma vez, nos dois modos
 loadData();
 setInterval(loadData, 30_000);
