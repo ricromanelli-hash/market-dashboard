@@ -106,14 +106,30 @@ function renderBrasilRatesRows(brasilRates) {
   ].join('');
 }
 
+// CPI dos EUA: variação em 12 meses (fonte BLS), no mesmo formato do IPCA.
 function renderCpiRow(cpi) {
+  if (!cpi || typeof cpi.value !== 'number') {
+    return `
+      <div class="row">
+        <div class="row-label">
+          <span class="row-name">CPI</span>
+          <span class="row-symbol">CPI</span>
+        </div>
+        <div class="row-unavailable" title="${cpi?.reason || ''}">—</div>
+      </div>`;
+  }
+  const { cls, icon } = changeIcon(cpi.changePP);
+  const ppText = typeof cpi.changePP === 'number' ? `${cpi.changePP >= 0 ? '+' : ''}${cpi.changePP.toFixed(2)} p.p.` : '—';
   return `
     <div class="row">
       <div class="row-label">
         <span class="row-name">CPI</span>
-        <span class="row-symbol">CPI</span>
+        <span class="row-symbol">${cpi.refDate || 'CPI'}</span>
       </div>
-      <div class="row-unavailable" title="${cpi?.reason || ''}">—</div>
+      <div class="row-values">
+        <span class="row-price">${cpi.value.toFixed(2)}%</span>
+        <span class="row-change ${cls}">${icon} ${ppText}</span>
+      </div>
     </div>`;
 }
 

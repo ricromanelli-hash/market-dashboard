@@ -254,11 +254,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // A API do BCB (SGS) oscila e às vezes devolve HTML/XML de erro no lugar do JSON.
 // Tenta algumas vezes antes de desistir.
-async function fetchJsonWithRetry(url, label, tries = 3) {
+async function fetchJsonWithRetry(url, label, tries = 3, timeoutMs = 30000) {
   let lastErr;
   for (let i = 0; i < tries; i++) {
     try {
-      const res = await fetch(url, { headers: { 'User-Agent': UA, Accept: 'application/json' } });
+      const res = await fetch(url, {
+        headers: { 'User-Agent': UA, Accept: 'application/json' },
+        signal: AbortSignal.timeout(timeoutMs), // evita ficar pendurado se a origem travar
+      });
       if (!res.ok) throw new Error(`${label}: HTTP ${res.status}`);
       const text = await res.text();
       const trimmed = text.trimStart();
@@ -284,6 +287,50 @@ async function refreshIpca() {
     changePP: prev !== null ? +(last - prev).toFixed(2) : null,
     refDate: data[data.length - 1].data,
   };
+}
+
+// CPI dos EUA via API pública v1 do BLS (não exige chave). Série CUUR0000SA0 =
+// CPI-U, todos os itens, média das cidades dos EUA. A API devolve o ÍNDICE, então
+// calculamos a variação em 12 meses (equivalente ao IPCA acumulado que exibimos).
+// A v1 limita ~25 requisições/dia por IP e o dado é mensal — por isso o cache longo.
+const BLS_CPI_URL = 'https://api.bls.gov/publicAPI/v1/timeseries/data/CUUR0000SA0';
+const CPI_MIN_INTERVAL_MS = 6 * 60 * 60 * 1000;
+let lastCpiFetch = 0;
+
+async function refreshCpi() {
+  const fresh = typeof cache.cpi?.value === 'number';
+  if (fresh && Date.now() - lastCpiFetch < CPI_MIN_INTERVAL_MS) return; // respeita o limite diário
+  const data = await fetchJsonWithRetry(BLS_CPI_URL, 'BLS CPI', 2, 45000);
+  const series = data?.Results?.series?.[0]?.data;
+  if (!Array.isArray(series) || series.length === 0) throw new Error('BLS CPI: sem dados');
+
+  const byPeriod = new Map();
+  const valid = [];
+  for (const p of series) {
+    const v = parseFloat(p.value);
+    if (!Number.isFinite(v)) continue; // o BLS usa "-" quando o dado não existe
+    byPeriod.set(`${p.year}-${p.period}`, v);
+    valid.push(p);
+  }
+  const yoy = (p) => {
+    const cur = byPeriod.get(`${p.year}-${p.period}`);
+    const base = byPeriod.get(`${Number(p.year) - 1}-${p.period}`);
+    if (!cur || !base) return null;
+    return ((cur / base) - 1) * 100;
+  };
+
+  const last = valid[0];
+  const lastYoY = last ? yoy(last) : null;
+  if (lastYoY === null) throw new Error('BLS CPI: sem base de 12 meses');
+  const prevYoY = valid[1] ? yoy(valid[1]) : null;
+
+  cache.cpi = {
+    label: 'CPI',
+    value: +lastYoY.toFixed(2),
+    changePP: prevYoY !== null ? +(lastYoY - prevYoY).toFixed(2) : null,
+    refDate: `${last.periodName}/${last.year}`,
+  };
+  lastCpiFetch = Date.now();
 }
 
 async function refreshTesouroIpca2032() {
@@ -505,6 +552,7 @@ async function refreshCalendar() {
 async function refreshSlowData() {
   const jobs = await Promise.allSettled([
     refreshIpca(),
+    refreshCpi(),
     refreshTesouroIpca2032(),
     refreshDiFutures(),
     refreshNews(),
