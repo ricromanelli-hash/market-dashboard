@@ -67,14 +67,16 @@ body.tv-mode .pair-group > .card { margin-bottom: 10px; }
 }
 
 /* ---- Juros Reais (país · taxa · inflação · real) ---- */
+/* Larguras fixas: com `auto` cada linha é um grid próprio e dimensiona conforme o
+   seu conteúdo, o que desalinhava as colunas (o "—" do 30a é bem mais estreito). */
 .rr-row {
   display: grid;
-  grid-template-columns: 1fr repeat(5, auto);
-  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) repeat(4, 36px) 42px;
+  gap: 4px;
   align-items: center;
-  padding: 4px 10px;
+  padding: 4px 9px;
   border-bottom: 1px solid #f0f2ef;
-  font-size: 12.5px;
+  font-size: 11.5px;
 }
 .rr-row:last-child { border-bottom: none; }
 
@@ -97,8 +99,7 @@ body.tv-mode .pair-group > .card { margin-bottom: 10px; }
 
 .rr-num {
   text-align: right;
-  font-variant-numeric: tabular-nums;
-  min-width: 38px;
+  font-variant-numeric: tabular-nums; /* dígitos de largura igual: colunas alinhadas */
 }
 
 .rr-real { font-weight: 700; }
