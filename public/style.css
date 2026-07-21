@@ -69,8 +69,8 @@ body.tv-mode .pair-group > .card { margin-bottom: 10px; }
 /* ---- Juros Reais (país · taxa · inflação · real) ---- */
 .rr-row {
   display: grid;
-  grid-template-columns: 1fr auto auto auto;
-  gap: 8px;
+  grid-template-columns: 1fr repeat(5, auto);
+  gap: 6px;
   align-items: center;
   padding: 4px 10px;
   border-bottom: 1px solid #f0f2ef;

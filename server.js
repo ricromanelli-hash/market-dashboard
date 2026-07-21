@@ -123,16 +123,22 @@ const WORLD_INDICES = [
 // Taxa básica: BIS (WS_CBPOL, taxas de política monetária dos bancos centrais).
 // Inflação: OCDE (CPI, variação em 12 meses) — validada contra o IPCA/BCB e o CPI/BLS.
 // A Alemanha usa a taxa do BCE (código XM), por não ter política monetária própria.
+// `y30`: título de 30 anos. Só os EUA têm série pública gratuita (Yahoo ^TYX) —
+// a OCDE cobre apenas curto prazo, 3 meses e longo prazo (10 anos, medida IRLT).
 const REAL_RATE_COUNTRIES = [
   { label: 'Brasil', bis: 'BR', oecd: 'BRA' },
   { label: 'Colômbia', bis: 'CO', oecd: 'COL' },
-  { label: 'Reino Unido', bis: 'GB', oecd: 'GBR' },
+  { label: 'R. Unido', bis: 'GB', oecd: 'GBR' },
   { label: 'Austrália', bis: 'AU', oecd: 'AUS' },
-  { label: 'EUA', bis: 'US', oecd: 'USA' },
+  { label: 'EUA', bis: 'US', oecd: 'USA', y30: '^TYX' },
   { label: 'Alemanha', bis: 'XM', oecd: 'DEU' },
   { label: 'Canadá', bis: 'CA', oecd: 'CAN' },
-  { label: 'Zona do Euro', bis: 'XM', oecd: 'EA20' },
+  { label: 'Z. Euro', bis: 'XM', oecd: 'EA20' },
 ];
+// Juros de 10 anos (medida IRLT). Essa base rejeita consultas com chave específica,
+// então baixamos o dataset inteiro (~80KB) e filtramos aqui.
+const OECD_IRLT_URL = 'https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_FINMARK,4.0/'
+  + '?lastNObservations=1&format=csv&dimensionAtObservation=AllDimensions';
 const BIS_CBPOL_URL = 'https://stats.bis.org/api/v2/data/dataflow/BIS/WS_CBPOL/1.0/D.'
   + [...new Set(REAL_RATE_COUNTRIES.map((c) => c.bis))].join('+')
   + '?lastNObservations=1&format=csv';
@@ -461,10 +467,30 @@ async function fetchCsv(url, label) {
 
 // Juros reais pela fórmula de Fisher: (1+i)/(1+π) − 1
 async function refreshRealRates() {
-  const [bisRows, oecdRows] = await Promise.all([
+  const [bisRows, oecdRows, irltRows, y30Map] = await Promise.all([
     fetchCsv(BIS_CBPOL_URL, 'BIS taxas'),
     fetchCsv(OECD_CPI_URL, 'OCDE inflação'),
+    fetchCsv(OECD_IRLT_URL, 'OCDE juros 10a'),
+    // 30 anos só existe para os EUA (^TYX)
+    (async () => {
+      const out = new Map();
+      await Promise.all(REAL_RATE_COUNTRIES.filter((c) => c.y30).map(async (c) => {
+        try {
+          const q = await fetchQuote(c.y30);
+          out.set(c.oecd, q.price);
+        } catch { /* mantém vazio se falhar */ }
+      }));
+      return out;
+    })(),
   ]);
+
+  // IRLT mensal (a base traz também séries trimestrais e anuais)
+  const tenY = new Map();
+  for (const r of irltRows) {
+    if (r.MEASURE !== 'IRLT' || r.FREQ !== 'M') continue;
+    const v = parseFloat(r.OBS_VALUE);
+    if (Number.isFinite(v)) tenY.set(r.REF_AREA, v);
+  }
   const policy = new Map();
   for (const r of bisRows) {
     const v = parseFloat(r.OBS_VALUE);
@@ -481,11 +507,15 @@ async function refreshRealRates() {
     const inf = inflation.get(c.oecd);
     if (!p || !inf) return { label: c.label, unavailable: true };
     const real = ((1 + p.value / 100) / (1 + inf.value / 100) - 1) * 100;
+    const y10 = tenY.get(c.oecd);
+    const y30 = y30Map.get(c.oecd);
     return {
       label: c.label,
       policy: +p.value.toFixed(2),
       inflation: +inf.value.toFixed(2),
       real: +real.toFixed(2),
+      y10: Number.isFinite(y10) ? +y10.toFixed(2) : null,
+      y30: Number.isFinite(y30) ? +y30.toFixed(2) : null,
       period: inf.period, // mês de referência da inflação (o mais defasado dos dois)
     };
   });
