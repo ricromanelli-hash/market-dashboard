@@ -94,8 +94,9 @@ body.tv-mode .pair-group > .card { margin-bottom: 10px; }
   background: #eef2ee;
   color: var(--green-header);
   font-weight: 700;
-  font-size: 10.5px;
+  font-size: 9.5px;
   text-transform: uppercase;
+  letter-spacing: -0.2px; /* "BÁSICA" precisa caber na coluna de 34px */
 }
 .rr-head span { text-align: right; }
 .rr-head .rr-pais { text-align: left; }
