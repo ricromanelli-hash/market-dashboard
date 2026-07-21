@@ -113,8 +113,12 @@ function renderWorldIndicesCard(regions) {
   }
   const body = regions.map((r) => {
     const rows = (r.items || []).map((it) => {
+      // bandeira do país da bolsa (flagcdn); emoji não renderiza em Windows/TVs
+      const flag = it.flag
+        ? `<img class="idx-flag" src="https://flagcdn.com/w40/${it.flag}.png" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`
+        : '<span class="idx-flag"></span>';
       if (it.error || typeof it.price !== 'number') {
-        return `<div class="row idx-row"><div class="row-label"><span class="row-name">${it.label}</span></div>
+        return `<div class="row idx-row">${flag}<span class="idx-name">${it.label}</span>
           <div class="row-unavailable">indisponível</div></div>`;
       }
       const up = (it.changePct ?? 0) >= 0;
@@ -122,6 +126,7 @@ function renderWorldIndicesCard(regions) {
       const pct = typeof it.changePct === 'number' ? `${it.changePct >= 0 ? '+' : ''}${it.changePct.toFixed(2)}%` : '';
       return `
         <div class="row idx-row">
+          ${flag}
           <span class="idx-name">${it.label}</span>
           ${sparkline(it.spark, up)}
           <span class="idx-values">

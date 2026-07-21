@@ -93,29 +93,30 @@ const GROUPS = [
 
 // Índices mundiais por região, com mini-gráfico de 2 dias (formato "world indices").
 // O COLCAP (Colômbia) não existe no Yahoo Finance, por isso ficou de fora.
+// `flag`: código ISO usado nas bandeiras do flagcdn.com
 const WORLD_INDICES = [
   { region: 'Américas', items: [
-    { symbol: '^DJI', label: 'Dow Jones' },
-    { symbol: '^GSPC', label: 'S&P 500' },
-    { symbol: '^IXIC', label: 'Nasdaq' },
-    { symbol: '^GSPTSE', label: 'S&P/TSX Comp' },
-    { symbol: '^MXX', label: 'S&P/BMV IPC' },
-    { symbol: '^BVSP', label: 'Ibovespa' },
-    { symbol: '^IPSA', label: 'Chile IPSA' },
-    { symbol: '^MERV', label: 'ARG MERVAL' },
-    { symbol: '^SPBLPGPT', label: 'Peru S&P/BVL' },
+    { symbol: '^DJI', label: 'Dow Jones', flag: 'us' },
+    { symbol: '^GSPC', label: 'S&P 500', flag: 'us' },
+    { symbol: '^IXIC', label: 'Nasdaq', flag: 'us' },
+    { symbol: '^GSPTSE', label: 'S&P/TSX Comp', flag: 'ca' },
+    { symbol: '^MXX', label: 'S&P/BMV IPC', flag: 'mx' },
+    { symbol: '^BVSP', label: 'Ibovespa', flag: 'br' },
+    { symbol: '^IPSA', label: 'Chile IPSA', flag: 'cl' },
+    { symbol: '^MERV', label: 'ARG MERVAL', flag: 'ar' },
+    { symbol: '^SPBLPGPT', label: 'Peru S&P/BVL', flag: 'pe' },
   ]},
   { region: 'EMEA', items: [
-    { symbol: '^STOXX50E', label: 'Euro Stoxx 50' },
-    { symbol: '^FTSE', label: 'FTSE 100' },
-    { symbol: '^FCHI', label: 'CAC 40' },
-    { symbol: '^GDAXI', label: 'DAX' },
+    { symbol: '^STOXX50E', label: 'Euro Stoxx 50', flag: 'eu' },
+    { symbol: '^FTSE', label: 'FTSE 100', flag: 'gb' },
+    { symbol: '^FCHI', label: 'CAC 40', flag: 'fr' },
+    { symbol: '^GDAXI', label: 'DAX', flag: 'de' },
   ]},
   { region: 'Ásia/Pacífico', items: [
-    { symbol: '^N225', label: 'Nikkei' },
-    { symbol: '^HSI', label: 'Hang Seng' },
-    { symbol: '000300.SS', label: 'CSI 300' },
-    { symbol: '^AXJO', label: 'S&P/ASX 200' },
+    { symbol: '^N225', label: 'Nikkei', flag: 'jp' },
+    { symbol: '^HSI', label: 'Hang Seng', flag: 'hk' },
+    { symbol: '000300.SS', label: 'CSI 300', flag: 'cn' },
+    { symbol: '^AXJO', label: 'S&P/ASX 200', flag: 'au' },
   ]},
 ];
 

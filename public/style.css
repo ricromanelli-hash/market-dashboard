@@ -42,6 +42,16 @@ body.tv-mode .pair-group > .card { margin-bottom: 10px; }
   padding: 4px 10px;
 }
 
+/* bandeira do país da bolsa */
+.idx-flag {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 13px;
+  object-fit: cover;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
 .idx-name {
   flex: 1;
   min-width: 0;
