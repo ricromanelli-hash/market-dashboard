@@ -17,7 +17,8 @@
 /* âncora dos widgets sobrepostos (calendário/taxas), que ficam fora do #grid */
 #stage { position: relative; }
 
-.rates-band { position: absolute; }
+/* widgets persistentes (calendário e taxas) são sobrepostos aos seus slots nos dois modos */
+.rates-band, .cal-band { position: absolute; }
 
 /* ---- Tabela de Índices Mundiais (nome · mini-gráfico 2 dias · valor) ---- */
 /* pares que devem permanecer na mesma coluna (Brasil+Índices, Saneamento+Telecom) */
@@ -246,10 +247,6 @@ body {
 .cal-footer a { color: var(--symbol-color); }
 
 /* faixa do widget do Investing.com, fora do grid (não recarrega no refresh) */
-.cal-band {
-  padding: 0 20px;
-  margin-top: 20px;
-}
 
 .cal-widget-card { overflow: hidden; }
 
@@ -400,31 +397,15 @@ body.tv-mode .topbar {
   border-bottom: none;
   background: transparent;
 }
-body.tv-mode .topbar h1 { font-size: 22px; color: #eafff5; }
-body.tv-mode .subtitle { font-size: 11px; color: #9fb3aa; }
+body.tv-mode .topbar h1 { font-size: 19px; color: #eafff5; margin: 0; }
+/* a lista de fontes não agrega numa TV e custa uma linha do topo */
+body.tv-mode .subtitle { display: none; }
 body.tv-mode .updated-at { font-size: 12px; color: #cfe; }
 body.tv-mode #refreshBtn { display: none; }
 
-/* painel lateral só existe no modo TV */
-#tvSide { display: none; }
+#tvSide { display: none; } /* painel lateral antigo, substituído pela 5ª coluna */
 
-/* duas regiões: grid (esquerda) + painel do calendário (direita, 650px = tamanho
-   nativo do widget do Investing, para ficar legível de longe) */
-body.tv-mode #content {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-}
-/* painel um pouco mais estreito que os 650px nativos do widget: o calendário é
-   reduzido levemente (~86%, ainda bem legível) e sobra largura para as colunas */
-body.tv-mode #tvSide {
-  display: block;
-  width: 560px;
-  flex: 0 0 560px;
-}
-
-/* layout denso: colunas masonry preenchidas de cima a baixo */
-/* as colunas do modo TV são montadas por packTvColumns (masonry em JS) */
+/* colunas fixas do modo TV (ordem definida em TV_LAYOUT) */
 body.tv-mode .grid {
   display: block;
   padding: 0;
@@ -440,11 +421,21 @@ body.tv-mode .tv-col {
   flex: 1 1 0;
   min-width: 0;
 }
+/* última coluna mais larga: o calendário do Investing tem 650px nativos */
+body.tv-mode .tv-col-wide {
+  flex: 0 0 520px;
+  width: 520px;
+}
+
+/* tabela de juros reais compacta na TV */
+body.tv-mode .rr-row { padding: 2px 8px; font-size: 11.5px; }
+body.tv-mode .rr-head { font-size: 9.5px; }
 body.tv-mode .tv-col > * { margin-bottom: 10px; }
+body.tv-mode .tv-col > *:last-child { margin-bottom: 0; }
 
 /* índices mundiais compactos na TV: valor e % na mesma linha do nome */
-body.tv-mode .row.idx-row { padding: 1px 8px; gap: 4px; }
-body.tv-mode .idx-region { font-size: 9.5px; padding: 1px 8px; }
+body.tv-mode .row.idx-row { padding: 0 8px; gap: 4px; line-height: 1.45; }
+body.tv-mode .idx-region { font-size: 9.5px; padding: 0 8px; }
 body.tv-mode .idx-name { font-size: 11px; }
 body.tv-mode .idx-values { flex-direction: row; align-items: baseline; gap: 5px; }
 body.tv-mode .idx-price { font-size: 11px; }
@@ -452,14 +443,7 @@ body.tv-mode .idx-pct { font-size: 9.5px; }
 body.tv-mode .spark, body.tv-mode .spark-empty { flex-basis: 32px; width: 32px; height: 12px; }
 /* o calendário do Investing é sobreposto ao slot reservado logo abaixo da Agenda IBGE
    (posicionado por positionCalWidget); fica fora do #grid para não recarregar no refresh */
-body.tv-mode .cal-band {
-  position: absolute;
-  padding: 0;
-  margin: 0;
-}
-
-/* no painel lateral: Agenda IBGE em cima, calendário logo abaixo */
-body.tv-mode #tvSide .card { margin: 0 0 10px; }
+body.tv-mode .cal-band { padding: 0; margin: 0; }
 
 /* espaço reservado no fluxo; a altura é definida via JS */
 body.tv-mode .cal-slot { margin: 0; }
@@ -475,8 +459,9 @@ body.tv-mode .card-header { font-size: 14.5px; padding: 5px 9px; }
 body.tv-mode .row { padding: 5px 9px; font-size: 14px; }
 body.tv-mode .row-name { font-weight: 600; }
 body.tv-mode .row-logo { width: 22px; height: 22px; flex-basis: 22px; }
-/* numa TV a data de referência do indicador não compensa a linha extra */
-body.tv-mode .rate-row .row-symbol { display: none; }
+/* Numa TV o ticker (e a data de referência) não compensam a linha extra: com o logo
+   e o nome a identificação já é clara, e cada linha cai de ~44px para ~26px. */
+body.tv-mode .row-symbol { display: none; }
 body.tv-mode .row-symbol { font-size: 10.5px; }
 body.tv-mode .row-change { font-size: 13px; }
 body.tv-mode .news-item { padding: 5px 9px; font-size: 12.5px; }

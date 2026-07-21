@@ -303,7 +303,7 @@ function ensureCalendarWidget() {
 const INVESTING_RATES_SRC = 'https://sslirates.investing.com/index.php?rows=1&bg1=FFFFFF&bg2=F1F5F8&text_color=333333&enable_border=show&border_color=0452A1&header_bg=0452A1&header_text=FFFFFF&force_lang=12';
 const RATES_IFRAME_W = 108;
 const RATES_IFRAME_H = 146;
-const RATES_MAX_SCALE = 1.2; // esticar até a coluna (2,4x) deixaria o card alto demais
+const RATES_MAX_SCALE = 1.0; // esticar até a coluna deixaria o card alto demais
 
 function ensureRatesWidget() {
   const host = document.getElementById('ratesWidget');
@@ -345,50 +345,6 @@ function positionWidget(hostId, slotId, nativeW, nativeH, maxScale = Infinity) {
   host.style.left = `${slot.offsetLeft}px`;
 }
 
-// Empacotamento das colunas no modo TV. O `column-count` do CSS balanceia mal quando
-// há cards grandes: empilhava EUA+Brasil numa coluna (estourando a tela) enquanto
-// outra ficava com 340px vazios. Aqui cada card vai sempre para a coluna mais curta.
-const TV_COLUMNS = 6;
-const TV_COL_GAP = 10;
-
-function packTvColumns() {
-  if (!TV_MODE) return;
-  // idempotente: numa segunda passada os cards já estão dentro das colunas
-  const packed = grid.querySelector('.tv-cols');
-  const items = packed
-    ? [...packed.querySelectorAll(':scope > .tv-col > *')]
-    : [...grid.children];
-  if (items.length === 0) return;
-
-  const wrap = document.createElement('div');
-  wrap.className = 'tv-cols';
-  const cols = Array.from({ length: TV_COLUMNS }, () => {
-    const col = document.createElement('div');
-    col.className = 'tv-col';
-    wrap.appendChild(col);
-    return col;
-  });
-  grid.replaceChildren(wrap);
-
-  // mede com a largura final: as colunas são flex:1, então a primeira já tem a
-  // largura definitiva mesmo com todos os cards dentro
-  items.forEach((el) => cols[0].appendChild(el));
-  const heights = items.map((el) => el.offsetHeight);
-
-  // LPT (maiores primeiro): equilibra bem melhor que a ordem original, que deixava
-  // uma coluna com 1100px e outra com 730px.
-  const totals = new Array(TV_COLUMNS).fill(0);
-  const order = items.map((_, i) => i).sort((a, b) => heights[b] - heights[a]);
-  for (const i of order) {
-    let best = 0;
-    for (let c = 1; c < TV_COLUMNS; c++) {
-      if (totals[c] < totals[best]) best = c;
-    }
-    cols[best].appendChild(items[i]);
-    totals[best] += heights[i] + TV_COL_GAP;
-  }
-}
-
 async function loadData() {
   try {
     const res = await fetch('/api/data', { cache: 'no-store' });
@@ -399,77 +355,65 @@ async function loadData() {
   }
 }
 
+// Construtores de card por chave. Os slots (Calendário/Taxas) só reservam espaço —
+// os iframes vivem fora do #grid e são sobrepostos por positionCalWidget.
+function cardBuilders(data) {
+  const g = data.groups || {};
+  const newsLimit = TV_MODE ? TV_NEWS_LIMIT : undefined;
+  const builders = {
+    'Estados Unidos': () => renderGroupCard('Estados Unidos', g['Estados Unidos'], renderCpiRow(data.cpi)),
+    'Brasil': () => renderGroupCard('Brasil', g['Brasil'], renderBrasilRatesRows(data.brasilRates)),
+    'IndicesMundiais': () => renderWorldIndicesCard(data.worldIndices),
+    'JurosReais': () => renderRealRatesCard(data.realRates),
+    'TaxasJuros': () => '<div id="ratesSlot" class="rates-slot"></div>',
+    'AgendaIBGE': () => renderCalendarCard(data.calendar, TV_MODE ? TV_AGENDA_LIMIT : undefined),
+    'CalendarioEconomico': () => '<div id="calSlot" class="cal-slot"></div>',
+    'NoticiasMacro': () => renderNewsCard(data.macroNews, 'Notícias — Indicadores Macro', newsLimit),
+    'NoticiasEmpresas': () => renderMainNewsCard(data, newsLimit),
+  };
+  // demais setores vêm direto do backend
+  for (const title of Object.keys(g)) {
+    if (!builders[title]) builders[title] = () => renderGroupCard(title, g[title]);
+  }
+  return builders;
+}
+
+// Layout fixo do modo TV: cada array é uma coluna, na ordem definida pelo usuário.
+// A última coluna é mais larga para acomodar o calendário do Investing.
+const TV_LAYOUT = [
+  ['Estados Unidos', 'Brasil'],
+  ['Commodities', 'IndicesMundiais', 'TaxasJuros', 'JurosReais'],
+  ['Bancos', 'Energia', 'Seguros', 'Saneamento', 'Telecom'],
+  ['Mineração', 'Petróleo & Gás', 'Papel & Celulose', 'Metalurgia & Siderurgia', 'Químicos & Petroquímicos'],
+  ['AgendaIBGE', 'CalendarioEconomico', 'NoticiasMacro', 'NoticiasEmpresas'],
+];
+
 function render(data) {
   lastData = data;
-  const groupTitles = Object.keys(data.groups || {});
-  const cards = [];
-
-  const usIdx = groupTitles.indexOf('Estados Unidos');
-  if (usIdx !== -1) cards.push(renderGroupCard('Estados Unidos', data.groups['Estados Unidos'], renderCpiRow(data.cpi)));
-
-  // Brasil, Índices Mundiais e Juros Reais entram em sequência (sem wrapper: um bloco
-  // único de ~1200px atrapalhava o empacotamento das colunas no modo TV)
-  const brIdx = groupTitles.indexOf('Brasil');
-  if (brIdx !== -1) {
-    // Brasil + Índices Mundiais formam um bloco: o masonry os mantém na mesma coluna,
-    // garantindo que a tabela de índices fique logo abaixo do Brasil.
-    cards.push(
-      `<div class="pair-group">${renderGroupCard('Brasil', data.groups['Brasil'], renderBrasilRatesRows(data.brasilRates))}${renderWorldIndicesCard(data.worldIndices)}</div>`
-    );
-    cards.push(renderRealRatesCard(data.realRates));
-  }
-
-  for (const title of groupTitles) {
-    if (title === 'Estados Unidos' || title === 'Brasil') continue;
-    if (title === 'Commodities') continue;
-    // Commodities and calendar are placed right after Brasil-related cards, matching original layout
-  }
-
-  // Commodities + slot das taxas de juros ficam juntos (o widget é sobreposto ao slot)
-  if (groupTitles.includes('Commodities')) {
-    cards.push(`<div class="rates-group">${renderGroupCard('Commodities', data.groups['Commodities'])}<div id="ratesSlot" class="rates-slot"></div></div>`);
-  }
-
-  // No modo TV, Agenda IBGE e calendário vão para o painel lateral (650px), onde o
-  // widget do Investing cabe em tamanho nativo. O slot apenas reserva o espaço — o
-  // iframe real é sobreposto por positionCalWidget, sem nunca ser recriado.
+  const builders = cardBuilders(data);
   const side = document.getElementById('tvSide');
+  if (side) side.innerHTML = '';
+
   if (TV_MODE) {
-    if (side) side.innerHTML = renderCalendarCard(data.calendar, TV_AGENDA_LIMIT) + '<div id="calSlot" class="cal-slot"></div>';
+    const cols = TV_LAYOUT.map((keys, i) => {
+      const inner = keys.map((k) => (builders[k] ? builders[k]() : '')).join('');
+      const wide = i === TV_LAYOUT.length - 1 ? ' tv-col-wide' : '';
+      return `<div class="tv-col${wide}">${inner}</div>`;
+    }).join('');
+    grid.innerHTML = `<div class="tv-cols">${cols}</div>`;
   } else {
-    if (side) side.innerHTML = '';
-    cards.push(renderCalendarCard(data.calendar));
-  }
-
-  const newsLimit = TV_MODE ? TV_NEWS_LIMIT : undefined;
-  cards.push(renderNewsCard(data.macroNews, 'Notícias — Indicadores Macro', newsLimit));
-  cards.push(renderMainNewsCard(data, newsLimit));
-
-  for (const title of groupTitles) {
-    if (['Estados Unidos', 'Brasil', 'Commodities'].includes(title)) continue;
-    if (title === 'Telecom') continue; // emitido junto com Saneamento
-    // Saneamento + Telecom formam um bloco, para o Telecom ficar sempre logo abaixo
-    if (title === 'Saneamento' && data.groups['Telecom']) {
-      cards.push(
-        `<div class="pair-group">${renderGroupCard('Saneamento', data.groups['Saneamento'])}${renderGroupCard('Telecom', data.groups['Telecom'])}</div>`
-      );
-      continue;
-    }
-    cards.push(renderGroupCard(title, data.groups[title]));
+    // modo normal: fluxo único, na mesma ordem lógica das colunas
+    const order = TV_LAYOUT.flat();
+    const seen = new Set(order);
+    const extras = Object.keys(builders).filter((k) => !seen.has(k));
+    grid.innerHTML = [...order, ...extras].map((k) => (builders[k] ? builders[k]() : '')).join('');
   }
 
   if (data.errors && data.errors.length) {
-    cards.push(`<div class="errors-bar">Algumas fontes falharam: ${data.errors.join(' · ')}</div>`);
+    grid.insertAdjacentHTML('beforeend', `<div class="errors-bar">Algumas fontes falharam: ${data.errors.join(' · ')}</div>`);
   }
 
-  grid.innerHTML = cards.join('');
-
-  // Duas passadas: na primeira os slots dos iframes ainda têm altura zero, então o
-  // empacotamento subestimaria os cards que os contêm. positionCalWidget define a
-  // altura real dos slots e a segunda passada reempacota já com as medidas certas.
-  packTvColumns();
-  positionCalWidget();
-  packTvColumns();
+  // alinha os iframes persistentes sobre seus slots recém-criados
   positionCalWidget();
 
   if (data.updatedAt) {
@@ -492,8 +436,7 @@ const TV_MODE = new URLSearchParams(location.search).get('tv') === '1';
 const STAGE_W = 1920;
 const STAGE_H = 1080;
 const TV_NEWS_LIMIT = 3;        // menos manchetes na TV, porém com o título inteiro
-const TV_AGENDA_LIMIT = 8;      // eventos da Agenda IBGE que cabem acima do calendário
-                                // (8 deixa margem para nomes longos quebrarem linha)
+const TV_AGENDA_LIMIT = 5;      // eventos da Agenda IBGE que cabem acima do calendário
 const CAL_IFRAME_W = 650;       // dimensões nativas do widget do Investing
 const CAL_IFRAME_H = 467;
 
