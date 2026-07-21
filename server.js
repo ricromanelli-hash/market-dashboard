@@ -507,7 +507,9 @@ async function refreshRealRates() {
     const inf = inflation.get(c.oecd);
     if (!p || !inf) return { label: c.label, unavailable: true };
     const real = ((1 + p.value / 100) / (1 + inf.value / 100) - 1) * 100;
-    const y10 = tenY.get(c.oecd);
+    // Brasil: prefixado do Tesouro (nominal). A série da OCDE não confere com a
+    // curva local, então nunca caímos de volta nela para o Brasil.
+    const y10 = c.oecd === 'BRA' ? brasil10yNominal?.value : tenY.get(c.oecd);
     const y30 = y30Map.get(c.oecd);
     return {
       label: c.label,
@@ -521,36 +523,62 @@ async function refreshRealRates() {
   });
 }
 
+// 10 anos nominal do Brasil, extraído do mesmo CSV (título prefixado com vencimento
+// mais próximo de hoje + 10 anos). A série "long-term" da OCDE para o Brasil não
+// reconcilia com a curva local (dava 9,13% com a Selic a 14,25% e o DI Jan/31 a 14,6%),
+// aparentemente por ser uma taxa real — por isso o Brasil usa esta fonte.
+let brasil10yNominal = null;
+
+const parseBrDate = (s) => {
+  const [d, m, y] = s.split('/').map(Number);
+  return new Date(y, m - 1, d);
+};
+
 async function refreshTesouroIpca2032() {
   const res = await fetch(TESOURO_CSV_URL, { headers: { 'User-Agent': UA } });
   if (!res.ok) throw new Error(`Tesouro Transparente: HTTP ${res.status}`);
   const text = await res.text();
   const lines = text.split('\n');
-  const rows = [];
+  const ipcaRows = [];
+  const prefixados = [];
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i];
-    // "Tesouro IPCA+" (título curto, sem cupom semestral) — exclui "Tesouro IPCA+ com Juros Semestrais"
-    if (!line.startsWith('Tesouro IPCA+;')) continue;
+    const isIpca = line.startsWith('Tesouro IPCA+;'); // exclui "com Juros Semestrais"
+    const isPrefixado = line.startsWith('Tesouro Prefixado'); // LTN e NTN-F: nominais
+    if (!isIpca && !isPrefixado) continue;
     const cols = line.split(';');
-    if (cols[1] !== TESOURO_IPCA_2032_VENCIMENTO) continue;
-    rows.push({ base: cols[2], taxaCompra: parseFloat(cols[3].replace(',', '.')) });
+    const taxa = parseFloat((cols[3] || '').replace(',', '.'));
+    if (!Number.isFinite(taxa)) continue;
+    if (isIpca && cols[1] === TESOURO_IPCA_2032_VENCIMENTO) {
+      ipcaRows.push({ base: cols[2], taxaCompra: taxa });
+    } else if (isPrefixado) {
+      prefixados.push({ venc: cols[1], base: cols[2], taxa });
+    }
   }
-  if (rows.length === 0) {
+  if (ipcaRows.length === 0) {
     throw new Error(`Tesouro IPCA+ ${TESOURO_IPCA_2032_VENCIMENTO}: não encontrado no CSV`);
   }
-  const parseDate = (s) => {
-    const [d, m, y] = s.split('/').map(Number);
-    return new Date(y, m - 1, d);
-  };
-  rows.sort((a, b) => parseDate(b.base) - parseDate(a.base));
-  const last = rows[0];
-  const prev = rows[1];
+  ipcaRows.sort((a, b) => parseBrDate(b.base) - parseBrDate(a.base));
+  const last = ipcaRows[0];
+  const prev = ipcaRows[1];
   cache.brasilRates.tesouroIpca2032 = {
     label: 'Tesouro IPCA+ 2032',
     value: last.taxaCompra,
     changePP: prev ? +(last.taxaCompra - prev.taxaCompra).toFixed(2) : null,
     refDate: last.base,
   };
+
+  // prefixado mais próximo de 10 anos, na data base mais recente
+  const baseAtual = last.base;
+  const alvo = new Date();
+  alvo.setFullYear(alvo.getFullYear() + 10);
+  let melhor = null;
+  for (const p of prefixados) {
+    if (p.base !== baseAtual) continue;
+    const dist = Math.abs(parseBrDate(p.venc) - alvo);
+    if (!melhor || dist < melhor.dist) melhor = { ...p, dist };
+  }
+  brasil10yNominal = melhor ? { value: melhor.taxa, venc: melhor.venc } : null;
 }
 
 // ---- DI futuro (curva de juros) via ferramenta de Juros Futuros do InfoMoney ----
@@ -738,18 +766,20 @@ async function refreshCalendar() {
 }
 
 async function refreshSlowData() {
+  // O CSV do Tesouro alimenta o IPCA+ 2032 e o 10 anos nominal do Brasil, que
+  // refreshRealRates consome — por isso roda antes.
+  const tesouro = await Promise.allSettled([refreshTesouroIpca2032()]);
   const jobs = await Promise.allSettled([
     refreshIpca(),
     refreshCpi(),
     refreshRealRates(),
-    refreshTesouroIpca2032(),
     refreshDiFutures(),
     refreshNews(),
     refreshMacroNews(),
     refreshCompanyNews(),
     refreshCalendar(),
   ]);
-  cache.errors = jobs.filter((r) => r.status === 'rejected').map((r) => r.reason.message);
+  cache.errors = [...tesouro, ...jobs].filter((r) => r.status === 'rejected').map((r) => r.reason.message);
   cache.slowUpdatedAt = new Date().toISOString();
   cache.updatedAt = new Date().toISOString();
 }
