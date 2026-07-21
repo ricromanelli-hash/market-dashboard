@@ -19,9 +19,13 @@
       </div>
     </header>
     <section id="calWidget" class="cal-band"></section>
-    <main id="grid" class="grid">
-      <p class="loading">Carregando dados…</p>
-    </main>
+    <div id="content">
+      <main id="grid" class="grid">
+        <p class="loading">Carregando dados…</p>
+      </main>
+      <!-- painel lateral usado só no modo TV: Agenda IBGE + calendário em tamanho cheio -->
+      <aside id="tvSide"></aside>
+    </div>
   </div>
   <script src="app.js"></script>
 </body>

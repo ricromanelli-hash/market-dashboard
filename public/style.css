@@ -288,12 +288,30 @@ body.tv-mode .subtitle { font-size: 11px; color: #9fb3aa; }
 body.tv-mode .updated-at { font-size: 12px; color: #cfe; }
 body.tv-mode #refreshBtn { display: none; }
 
+/* painel lateral só existe no modo TV */
+#tvSide { display: none; }
+
+/* duas regiões: grid (esquerda) + painel do calendário (direita, 650px = tamanho
+   nativo do widget do Investing, para ficar legível de longe) */
+body.tv-mode #content {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+body.tv-mode #tvSide {
+  display: block;
+  width: 650px;
+  flex: 0 0 650px;
+}
+
 /* layout denso: colunas masonry preenchidas de cima a baixo */
 body.tv-mode .grid {
   display: block;
-  column-count: 7;
+  column-count: 5;
   column-gap: 9px;
   padding: 0;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 /* o calendário do Investing é sobreposto ao slot reservado logo abaixo da Agenda IBGE
    (posicionado por positionCalWidget); fica fora do #grid para não recarregar no refresh */
@@ -303,12 +321,11 @@ body.tv-mode .cal-band {
   margin: 0;
 }
 
-/* Agenda IBGE + slot do calendário nunca se separam ao quebrar coluna */
-body.tv-mode .cal-group { break-inside: avoid; }
-body.tv-mode .cal-group .card { margin-bottom: 10px; }
+/* no painel lateral: Agenda IBGE em cima, calendário logo abaixo */
+body.tv-mode #tvSide .card { margin: 0 0 10px; }
 
 /* espaço reservado no fluxo; a altura é definida via JS */
-body.tv-mode .cal-slot { margin: 0 0 10px; }
+body.tv-mode .cal-slot { margin: 0; }
 
 body.tv-mode .card {
   break-inside: avoid;

@@ -145,8 +145,9 @@ function renderMainNewsCard(data, limit) {
 
 const dayFmt = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', weekday: 'short' });
 
-function renderCalendarCard(calendar) {
-  const rows = (calendar || []).map((ev) => {
+function renderCalendarCard(calendar, limit) {
+  const list = limit ? (calendar || []).slice(0, limit) : calendar;
+  const rows = (list || []).map((ev) => {
     const [d, m, y] = ev.date.split('/').map(Number);
     const dt = new Date(y, m - 1, d);
     return `
@@ -219,11 +220,14 @@ function render(data) {
 
   if (groupTitles.includes('Commodities')) cards.push(renderGroupCard('Commodities', data.groups['Commodities']));
 
-  // No modo TV a Agenda IBGE e o calendário do Investing ficam colados: o slot só
-  // reserva o espaço (o iframe real é sobreposto por positionCalWidget, sem recarregar).
+  // No modo TV, Agenda IBGE e calendário vão para o painel lateral (650px), onde o
+  // widget do Investing cabe em tamanho nativo. O slot apenas reserva o espaço — o
+  // iframe real é sobreposto por positionCalWidget, sem nunca ser recriado.
+  const side = document.getElementById('tvSide');
   if (TV_MODE) {
-    cards.push(`<div class="cal-group">${renderCalendarCard(data.calendar)}<div id="calSlot" class="cal-slot"></div></div>`);
+    if (side) side.innerHTML = renderCalendarCard(data.calendar, TV_AGENDA_LIMIT) + '<div id="calSlot" class="cal-slot"></div>';
   } else {
+    if (side) side.innerHTML = '';
     cards.push(renderCalendarCard(data.calendar));
   }
 
@@ -265,6 +269,8 @@ const TV_MODE = new URLSearchParams(location.search).get('tv') === '1';
 const STAGE_W = 1920;
 const STAGE_H = 1080;
 const TV_NEWS_LIMIT = 5;        // menos manchetes na TV, porém com o título inteiro
+const TV_AGENDA_LIMIT = 8;      // eventos da Agenda IBGE que cabem acima do calendário
+                                // (8 deixa margem para nomes longos quebrarem linha)
 const CAL_IFRAME_W = 650;       // dimensões nativas do widget do Investing
 const CAL_IFRAME_H = 467;
 
