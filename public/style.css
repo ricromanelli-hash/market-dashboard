@@ -20,7 +20,10 @@
 .rates-band { position: absolute; }
 
 /* ---- Tabela de Índices Mundiais (nome · mini-gráfico 2 dias · valor) ---- */
-.brasil-group .card { margin-bottom: 16px; }
+/* pares que devem permanecer na mesma coluna (Brasil+Índices, Saneamento+Telecom) */
+.pair-group > .card { margin-bottom: 16px; }
+.pair-group > .card:last-child { margin-bottom: 0; }
+body.tv-mode .pair-group > .card { margin-bottom: 10px; }
 
 .idx-region {
   background: #eef2ee;
@@ -61,6 +64,47 @@
   line-height: 1.15;
   white-space: nowrap;
 }
+
+/* ---- Juros Reais (país · taxa · inflação · real) ---- */
+.rr-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 10px;
+  border-bottom: 1px solid #f0f2ef;
+  font-size: 12.5px;
+}
+.rr-row:last-child { border-bottom: none; }
+
+.rr-head {
+  background: #eef2ee;
+  color: var(--green-header);
+  font-weight: 700;
+  font-size: 10.5px;
+  text-transform: uppercase;
+}
+.rr-head span { text-align: right; }
+.rr-head .rr-pais { text-align: left; }
+
+.rr-pais {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rr-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  min-width: 38px;
+}
+
+.rr-real { font-weight: 700; }
+.rr-real.up { color: var(--green-up); }
+.rr-real.down { color: var(--red-down); }
+.rr-real.flat { color: var(--gray-flat); }
+.rr-na { color: var(--text-muted); font-style: italic; font-size: 11px; }
 
 .idx-price { font-weight: 600; font-size: 12.5px; }
 .idx-pct { font-size: 10.5px; font-weight: 600; }
@@ -380,14 +424,23 @@ body.tv-mode #tvSide {
 }
 
 /* layout denso: colunas masonry preenchidas de cima a baixo */
+/* as colunas do modo TV são montadas por packTvColumns (masonry em JS) */
 body.tv-mode .grid {
   display: block;
-  column-count: 6;
-  column-gap: 9px;
   padding: 0;
   flex: 1 1 auto;
   min-width: 0;
 }
+body.tv-mode .tv-cols {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+body.tv-mode .tv-col {
+  flex: 1 1 0;
+  min-width: 0;
+}
+body.tv-mode .tv-col > * { margin-bottom: 10px; }
 
 /* índices mundiais compactos na TV: valor e % na mesma linha do nome */
 body.tv-mode .row.idx-row { padding: 1px 8px; gap: 4px; }

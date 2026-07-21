@@ -119,6 +119,27 @@ const WORLD_INDICES = [
   ]},
 ];
 
+// ---- Juros reais por país ----
+// Taxa básica: BIS (WS_CBPOL, taxas de política monetária dos bancos centrais).
+// Inflação: OCDE (CPI, variação em 12 meses) — validada contra o IPCA/BCB e o CPI/BLS.
+// A Alemanha usa a taxa do BCE (código XM), por não ter política monetária própria.
+const REAL_RATE_COUNTRIES = [
+  { label: 'Brasil', bis: 'BR', oecd: 'BRA' },
+  { label: 'Colômbia', bis: 'CO', oecd: 'COL' },
+  { label: 'Reino Unido', bis: 'GB', oecd: 'GBR' },
+  { label: 'Austrália', bis: 'AU', oecd: 'AUS' },
+  { label: 'EUA', bis: 'US', oecd: 'USA' },
+  { label: 'Alemanha', bis: 'XM', oecd: 'DEU' },
+  { label: 'Canadá', bis: 'CA', oecd: 'CAN' },
+  { label: 'Zona do Euro', bis: 'XM', oecd: 'EA20' },
+];
+const BIS_CBPOL_URL = 'https://stats.bis.org/api/v2/data/dataflow/BIS/WS_CBPOL/1.0/D.'
+  + [...new Set(REAL_RATE_COUNTRIES.map((c) => c.bis))].join('+')
+  + '?lastNObservations=1&format=csv';
+const OECD_CPI_URL = 'https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_PRICES@DF_PRICES_ALL,1.0/'
+  + REAL_RATE_COUNTRIES.map((c) => c.oecd).join('+')
+  + '.M.N.CPI.PA._T.N.GY?lastNObservations=1&format=csv';
+
 const IPCA_SGS_SERIES = 13522; // IPCA - variação acumulada em 12 meses (BCB SGS, série oficial)
 
 // Calendário de divulgações do IBGE (API pública oficial). Mapeamos os principais
@@ -200,6 +221,7 @@ const cache = {
   companyNews: [],
   calendar: [],
   worldIndices: [],
+  realRates: [],
   errors: [],
 };
 
@@ -401,6 +423,72 @@ async function refreshCpi() {
     refDate: `${last.periodName}/${last.year}`,
   };
   lastCpiFetch = Date.now();
+}
+
+// CSV simples com suporte a campos entre aspas (o BIS traz vírgulas dentro do título).
+function parseCsv(text) {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim());
+  const rows = lines.map((line) => {
+    const cells = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (line[i + 1] === '"') { cur += '"'; i++; } else inQuotes = false;
+        } else cur += ch;
+      } else if (ch === '"') inQuotes = true;
+      else if (ch === ',') { cells.push(cur); cur = ''; }
+      else cur += ch;
+    }
+    cells.push(cur);
+    return cells;
+  });
+  const header = rows.shift() || [];
+  return rows.map((r) => Object.fromEntries(header.map((h, i) => [h, r[i]])));
+}
+
+async function fetchCsv(url, label) {
+  const res = await fetch(url, {
+    // a API da OCDE devolve 500 ("languageTag") sem Accept-Language
+    headers: { 'User-Agent': UA, 'Accept-Language': 'en' },
+    signal: AbortSignal.timeout(45000),
+  });
+  if (!res.ok) throw new Error(`${label}: HTTP ${res.status}`);
+  return parseCsv(await res.text());
+}
+
+// Juros reais pela fórmula de Fisher: (1+i)/(1+π) − 1
+async function refreshRealRates() {
+  const [bisRows, oecdRows] = await Promise.all([
+    fetchCsv(BIS_CBPOL_URL, 'BIS taxas'),
+    fetchCsv(OECD_CPI_URL, 'OCDE inflação'),
+  ]);
+  const policy = new Map();
+  for (const r of bisRows) {
+    const v = parseFloat(r.OBS_VALUE);
+    if (Number.isFinite(v)) policy.set(r.REF_AREA, { value: v, date: r.TIME_PERIOD });
+  }
+  const inflation = new Map();
+  for (const r of oecdRows) {
+    const v = parseFloat(r.OBS_VALUE);
+    if (Number.isFinite(v)) inflation.set(r.REF_AREA, { value: v, period: r.TIME_PERIOD });
+  }
+
+  cache.realRates = REAL_RATE_COUNTRIES.map((c) => {
+    const p = policy.get(c.bis);
+    const inf = inflation.get(c.oecd);
+    if (!p || !inf) return { label: c.label, unavailable: true };
+    const real = ((1 + p.value / 100) / (1 + inf.value / 100) - 1) * 100;
+    return {
+      label: c.label,
+      policy: +p.value.toFixed(2),
+      inflation: +inf.value.toFixed(2),
+      real: +real.toFixed(2),
+      period: inf.period, // mês de referência da inflação (o mais defasado dos dois)
+    };
+  });
 }
 
 async function refreshTesouroIpca2032() {
@@ -623,6 +711,7 @@ async function refreshSlowData() {
   const jobs = await Promise.allSettled([
     refreshIpca(),
     refreshCpi(),
+    refreshRealRates(),
     refreshTesouroIpca2032(),
     refreshDiFutures(),
     refreshNews(),

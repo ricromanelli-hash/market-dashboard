@@ -139,6 +139,33 @@ function renderWorldIndicesCard(regions) {
     </section>`;
 }
 
+// Juros reais por país: taxa básica (BIS) x inflação 12m (OCDE), fórmula de Fisher.
+function renderRealRatesCard(rows) {
+  if (!rows || rows.length === 0) {
+    return `<section class="card"><div class="card-header">Juros Reais</div>
+      <div class="card-body"><p class="row-unavailable" style="padding:12px">carregando…</p></div></section>`;
+  }
+  const head = `<div class="rr-row rr-head"><span class="rr-pais">País</span><span>Taxa</span><span>Infl.</span><span>Real</span></div>`;
+  const body = rows.map((r) => {
+    if (r.unavailable) {
+      return `<div class="rr-row"><span class="rr-pais">${r.label}</span><span class="rr-na" colspan="3">indisponível</span></div>`;
+    }
+    const cls = r.real > 0 ? 'up' : (r.real < 0 ? 'down' : 'flat');
+    return `
+      <div class="rr-row">
+        <span class="rr-pais" title="inflação de ${r.period}">${r.label}</span>
+        <span class="rr-num">${r.policy.toFixed(2)}</span>
+        <span class="rr-num">${r.inflation.toFixed(2)}</span>
+        <span class="rr-num rr-real ${cls}">${r.real >= 0 ? '+' : ''}${r.real.toFixed(2)}</span>
+      </div>`;
+  }).join('');
+  return `
+    <section class="card">
+      <div class="card-header">Juros Reais (% a.a.)</div>
+      <div class="card-body">${head}${body}</div>
+    </section>`;
+}
+
 function renderGroupCard(title, items, extraRows = '') {
   const rows = (items || []).map(renderQuoteRow).join('');
   const body = (rows || '<p class="row-unavailable" style="padding:12px">carregando…</p>') + extraRows;
@@ -318,6 +345,50 @@ function positionWidget(hostId, slotId, nativeW, nativeH, maxScale = Infinity) {
   host.style.left = `${slot.offsetLeft}px`;
 }
 
+// Empacotamento das colunas no modo TV. O `column-count` do CSS balanceia mal quando
+// há cards grandes: empilhava EUA+Brasil numa coluna (estourando a tela) enquanto
+// outra ficava com 340px vazios. Aqui cada card vai sempre para a coluna mais curta.
+const TV_COLUMNS = 6;
+const TV_COL_GAP = 10;
+
+function packTvColumns() {
+  if (!TV_MODE) return;
+  // idempotente: numa segunda passada os cards já estão dentro das colunas
+  const packed = grid.querySelector('.tv-cols');
+  const items = packed
+    ? [...packed.querySelectorAll(':scope > .tv-col > *')]
+    : [...grid.children];
+  if (items.length === 0) return;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'tv-cols';
+  const cols = Array.from({ length: TV_COLUMNS }, () => {
+    const col = document.createElement('div');
+    col.className = 'tv-col';
+    wrap.appendChild(col);
+    return col;
+  });
+  grid.replaceChildren(wrap);
+
+  // mede com a largura final: as colunas são flex:1, então a primeira já tem a
+  // largura definitiva mesmo com todos os cards dentro
+  items.forEach((el) => cols[0].appendChild(el));
+  const heights = items.map((el) => el.offsetHeight);
+
+  // LPT (maiores primeiro): equilibra bem melhor que a ordem original, que deixava
+  // uma coluna com 1100px e outra com 730px.
+  const totals = new Array(TV_COLUMNS).fill(0);
+  const order = items.map((_, i) => i).sort((a, b) => heights[b] - heights[a]);
+  for (const i of order) {
+    let best = 0;
+    for (let c = 1; c < TV_COLUMNS; c++) {
+      if (totals[c] < totals[best]) best = c;
+    }
+    cols[best].appendChild(items[i]);
+    totals[best] += heights[i] + TV_COL_GAP;
+  }
+}
+
 async function loadData() {
   try {
     const res = await fetch('/api/data', { cache: 'no-store' });
@@ -336,12 +407,16 @@ function render(data) {
   const usIdx = groupTitles.indexOf('Estados Unidos');
   if (usIdx !== -1) cards.push(renderGroupCard('Estados Unidos', data.groups['Estados Unidos'], renderCpiRow(data.cpi)));
 
-  // Brasil e Índices Mundiais ficam juntos (a tabela de índices vem logo abaixo)
+  // Brasil, Índices Mundiais e Juros Reais entram em sequência (sem wrapper: um bloco
+  // único de ~1200px atrapalhava o empacotamento das colunas no modo TV)
   const brIdx = groupTitles.indexOf('Brasil');
   if (brIdx !== -1) {
+    // Brasil + Índices Mundiais formam um bloco: o masonry os mantém na mesma coluna,
+    // garantindo que a tabela de índices fique logo abaixo do Brasil.
     cards.push(
-      `<div class="brasil-group">${renderGroupCard('Brasil', data.groups['Brasil'], renderBrasilRatesRows(data.brasilRates))}${renderWorldIndicesCard(data.worldIndices)}</div>`
+      `<div class="pair-group">${renderGroupCard('Brasil', data.groups['Brasil'], renderBrasilRatesRows(data.brasilRates))}${renderWorldIndicesCard(data.worldIndices)}</div>`
     );
+    cards.push(renderRealRatesCard(data.realRates));
   }
 
   for (const title of groupTitles) {
@@ -372,6 +447,14 @@ function render(data) {
 
   for (const title of groupTitles) {
     if (['Estados Unidos', 'Brasil', 'Commodities'].includes(title)) continue;
+    if (title === 'Telecom') continue; // emitido junto com Saneamento
+    // Saneamento + Telecom formam um bloco, para o Telecom ficar sempre logo abaixo
+    if (title === 'Saneamento' && data.groups['Telecom']) {
+      cards.push(
+        `<div class="pair-group">${renderGroupCard('Saneamento', data.groups['Saneamento'])}${renderGroupCard('Telecom', data.groups['Telecom'])}</div>`
+      );
+      continue;
+    }
     cards.push(renderGroupCard(title, data.groups[title]));
   }
 
@@ -381,7 +464,12 @@ function render(data) {
 
   grid.innerHTML = cards.join('');
 
-  // o grid foi reconstruído: realinha os widgets persistentes sobre os novos slots
+  // Duas passadas: na primeira os slots dos iframes ainda têm altura zero, então o
+  // empacotamento subestimaria os cards que os contêm. positionCalWidget define a
+  // altura real dos slots e a segunda passada reempacota já com as medidas certas.
+  packTvColumns();
+  positionCalWidget();
+  packTvColumns();
   positionCalWidget();
 
   if (data.updatedAt) {
@@ -403,7 +491,7 @@ grid.addEventListener('click', (e) => {
 const TV_MODE = new URLSearchParams(location.search).get('tv') === '1';
 const STAGE_W = 1920;
 const STAGE_H = 1080;
-const TV_NEWS_LIMIT = 4;        // menos manchetes na TV, porém com o título inteiro
+const TV_NEWS_LIMIT = 3;        // menos manchetes na TV, porém com o título inteiro
 const TV_AGENDA_LIMIT = 8;      // eventos da Agenda IBGE que cabem acima do calendário
                                 // (8 deixa margem para nomes longos quebrarem linha)
 const CAL_IFRAME_W = 650;       // dimensões nativas do widget do Investing
