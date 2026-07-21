@@ -309,10 +309,12 @@ body.tv-mode #content {
   align-items: flex-start;
   gap: 10px;
 }
+/* painel um pouco mais estreito que os 650px nativos do widget: o calendário é
+   reduzido levemente (~86%, ainda bem legível) e sobra largura para as colunas */
 body.tv-mode #tvSide {
   display: block;
-  width: 650px;
-  flex: 0 0 650px;
+  width: 560px;
+  flex: 0 0 560px;
 }
 
 /* layout denso: colunas masonry preenchidas de cima a baixo */
