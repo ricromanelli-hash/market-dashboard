@@ -18,6 +18,55 @@
 #stage { position: relative; }
 
 .rates-band { position: absolute; }
+
+/* ---- Tabela de Índices Mundiais (nome · mini-gráfico 2 dias · valor) ---- */
+.brasil-group .card { margin-bottom: 16px; }
+
+.idx-region {
+  background: #eef2ee;
+  color: var(--green-header);
+  font-weight: 700;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.row.idx-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+}
+
+.idx-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spark, .spark-empty {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 15px;
+}
+
+.idx-values {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.idx-price { font-weight: 600; font-size: 12.5px; }
+.idx-pct { font-size: 10.5px; font-weight: 600; }
+.idx-pct.up { color: var(--green-up); }
+.idx-pct.down { color: var(--red-down); }
+.idx-pct.flat { color: var(--gray-flat); }
 .rates-group { break-inside: avoid; }
 .rates-widget-wrap { overflow: hidden; }
 .rates-widget-wrap iframe {
@@ -333,12 +382,21 @@ body.tv-mode #tvSide {
 /* layout denso: colunas masonry preenchidas de cima a baixo */
 body.tv-mode .grid {
   display: block;
-  column-count: 5;
+  column-count: 6;
   column-gap: 9px;
   padding: 0;
   flex: 1 1 auto;
   min-width: 0;
 }
+
+/* índices mundiais compactos na TV: valor e % na mesma linha do nome */
+body.tv-mode .row.idx-row { padding: 1px 8px; gap: 4px; }
+body.tv-mode .idx-region { font-size: 9.5px; padding: 1px 8px; }
+body.tv-mode .idx-name { font-size: 11px; }
+body.tv-mode .idx-values { flex-direction: row; align-items: baseline; gap: 5px; }
+body.tv-mode .idx-price { font-size: 11px; }
+body.tv-mode .idx-pct { font-size: 9.5px; }
+body.tv-mode .spark, body.tv-mode .spark-empty { flex-basis: 32px; width: 32px; height: 12px; }
 /* o calendário do Investing é sobreposto ao slot reservado logo abaixo da Agenda IBGE
    (posicionado por positionCalWidget); fica fora do #grid para não recarregar no refresh */
 body.tv-mode .cal-band {
@@ -364,6 +422,8 @@ body.tv-mode .card-header { font-size: 14.5px; padding: 5px 9px; }
 body.tv-mode .row { padding: 5px 9px; font-size: 14px; }
 body.tv-mode .row-name { font-weight: 600; }
 body.tv-mode .row-logo { width: 22px; height: 22px; flex-basis: 22px; }
+/* numa TV a data de referência do indicador não compensa a linha extra */
+body.tv-mode .rate-row .row-symbol { display: none; }
 body.tv-mode .row-symbol { font-size: 10.5px; }
 body.tv-mode .row-change { font-size: 13px; }
 body.tv-mode .news-item { padding: 5px 9px; font-size: 12.5px; }

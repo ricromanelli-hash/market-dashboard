@@ -22,7 +22,7 @@ const GROUPS = [
   { title: 'Brasil', items: [
     { symbol: '^BVSP', label: 'Ibovespa' },
     { symbol: 'BRL=X', label: 'Dólar', displaySymbol: 'USDBRL=X' },
-    { symbol: 'EWZ', label: 'EWZ - iShares MSCI Brazil ETF' },
+    { symbol: 'EWZ', label: 'EWZ (MSCI Brazil)' },
   ]},
   { title: 'Commodities', items: [
     { symbol: 'SB=F', label: 'Açúcar NY nº11' },
@@ -88,6 +88,34 @@ const GROUPS = [
   { title: 'Químicos & Petroquímicos', items: [
     { symbol: 'UNIP6.SA', label: 'Unipar' },
     { symbol: 'BRKM3.SA', label: 'Braskem' },
+  ]},
+];
+
+// Índices mundiais por região, com mini-gráfico de 2 dias (formato "world indices").
+// O COLCAP (Colômbia) não existe no Yahoo Finance, por isso ficou de fora.
+const WORLD_INDICES = [
+  { region: 'Américas', items: [
+    { symbol: '^DJI', label: 'Dow Jones' },
+    { symbol: '^GSPC', label: 'S&P 500' },
+    { symbol: '^IXIC', label: 'Nasdaq' },
+    { symbol: '^GSPTSE', label: 'S&P/TSX Comp' },
+    { symbol: '^MXX', label: 'S&P/BMV IPC' },
+    { symbol: '^BVSP', label: 'Ibovespa' },
+    { symbol: '^IPSA', label: 'Chile IPSA' },
+    { symbol: '^MERV', label: 'ARG MERVAL' },
+    { symbol: '^SPBLPGPT', label: 'Peru S&P/BVL' },
+  ]},
+  { region: 'EMEA', items: [
+    { symbol: '^STOXX50E', label: 'Euro Stoxx 50' },
+    { symbol: '^FTSE', label: 'FTSE 100' },
+    { symbol: '^FCHI', label: 'CAC 40' },
+    { symbol: '^GDAXI', label: 'DAX' },
+  ]},
+  { region: 'Ásia/Pacífico', items: [
+    { symbol: '^N225', label: 'Nikkei' },
+    { symbol: '^HSI', label: 'Hang Seng' },
+    { symbol: '000300.SS', label: 'CSI 300' },
+    { symbol: '^AXJO', label: 'S&P/ASX 200' },
   ]},
 ];
 
@@ -171,6 +199,7 @@ const cache = {
   macroNews: [],
   companyNews: [],
   calendar: [],
+  worldIndices: [],
   errors: [],
 };
 
@@ -222,6 +251,34 @@ async function fetchQuote(symbol) {
   return { price, changePct, currency: meta.currency ?? null };
 }
 
+// Reduz a série a no máximo `max` pontos, para o sparkline não inflar o JSON.
+function downsample(values, max) {
+  if (values.length <= max) return values;
+  const step = values.length / max;
+  return Array.from({ length: max }, (_, i) => values[Math.floor(i * step)]);
+}
+
+// Índices mundiais: usa janela intradiária de 2 dias, que serve tanto para a cotação
+// atual quanto para o mini-gráfico ("2 dias") do formato solicitado.
+async function fetchIndexQuote(symbol) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=30m&range=2d`;
+  const res = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(20000) });
+  if (!res.ok) throw new Error(`Yahoo ${symbol}: HTTP ${res.status}`);
+  const json = await res.json();
+  const result = json?.chart?.result?.[0];
+  const meta = result?.meta;
+  if (!meta || typeof meta.regularMarketPrice !== 'number') {
+    throw new Error(`Yahoo ${symbol}: sem dados retornados`);
+  }
+  const price = meta.regularMarketPrice;
+  // aqui previousClose é o fechamento do pregão anterior (janela de 2 dias)
+  const prevClose = meta.previousClose ?? meta.chartPreviousClose;
+  const changePct = prevClose ? ((price - prevClose) / prevClose) * 100 : null;
+  const closes = (result?.indicators?.quote?.[0]?.close || []).filter((c) => typeof c === 'number');
+  const spark = downsample(closes, 40).map((n) => +n.toFixed(2));
+  return { price, changePct, spark };
+}
+
 async function mapWithConcurrency(items, limit, fn) {
   const results = new Array(items.length);
   let idx = 0;
@@ -247,6 +304,18 @@ async function refreshMarketData() {
     });
     cache.groups[group.title] = results;
   }
+
+  // índices mundiais (com mini-gráfico de 2 dias)
+  const regions = [];
+  for (const region of WORLD_INDICES) {
+    const items = await mapWithConcurrency(region.items, 6, async (item) => {
+      const quote = await fetchIndexQuote(item.symbol);
+      return { ...item, ...quote };
+    });
+    regions.push({ region: region.region, items });
+  }
+  cache.worldIndices = regions;
+
   cache.quotesUpdatedAt = new Date().toISOString();
   cache.updatedAt = new Date().toISOString();
 }

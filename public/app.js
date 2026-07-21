@@ -75,7 +75,7 @@ function renderRateRow(rate) {
   const ppText = typeof rate.changePP === 'number' ? `${rate.changePP >= 0 ? '+' : ''}${rate.changePP.toFixed(2)} p.p.` : '—';
   const sub = rate.refDate ? `<span class="row-symbol">ref. ${rate.refDate}</span>` : '';
   return `
-    <div class="row">
+    <div class="row rate-row">
       <div class="row-label">
         <span class="row-name">${rate.label}</span>
         ${sub}
@@ -85,6 +85,58 @@ function renderRateRow(rate) {
         <span class="row-change ${cls}">${icon} ${ppText}</span>
       </div>
     </div>`;
+}
+
+// Mini-gráfico ("2 dias") em SVG, no estilo da tabela de índices mundiais.
+function sparkline(values, up) {
+  if (!Array.isArray(values) || values.length < 2) return '<span class="spark-empty"></span>';
+  const w = 44;
+  const h = 15;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = (max - min) || 1;
+  const pts = values
+    .map((v, i) => `${((i / (values.length - 1)) * w).toFixed(1)},${(h - ((v - min) / range) * h).toFixed(1)}`)
+    .join(' ');
+  const stroke = up ? 'var(--green-up)' : 'var(--red-down)';
+  return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+    <polyline points="${pts}" fill="none" stroke="${stroke}" stroke-width="1.3" stroke-linejoin="round"/>
+  </svg>`;
+}
+
+const idxFmt = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function renderWorldIndicesCard(regions) {
+  if (!regions || regions.length === 0) {
+    return `<section class="card"><div class="card-header">Índices Mundiais</div>
+      <div class="card-body"><p class="row-unavailable" style="padding:12px">carregando…</p></div></section>`;
+  }
+  const body = regions.map((r) => {
+    const rows = (r.items || []).map((it) => {
+      if (it.error || typeof it.price !== 'number') {
+        return `<div class="row idx-row"><div class="row-label"><span class="row-name">${it.label}</span></div>
+          <div class="row-unavailable">indisponível</div></div>`;
+      }
+      const up = (it.changePct ?? 0) >= 0;
+      const { cls } = changeIcon(it.changePct);
+      const pct = typeof it.changePct === 'number' ? `${it.changePct >= 0 ? '+' : ''}${it.changePct.toFixed(2)}%` : '';
+      return `
+        <div class="row idx-row">
+          <span class="idx-name">${it.label}</span>
+          ${sparkline(it.spark, up)}
+          <span class="idx-values">
+            <span class="idx-price">${idxFmt.format(it.price)}</span>
+            <span class="idx-pct ${cls}">${pct}</span>
+          </span>
+        </div>`;
+    }).join('');
+    return `<div class="idx-region">${r.region}</div>${rows}`;
+  }).join('');
+  return `
+    <section class="card">
+      <div class="card-header">Índices Mundiais</div>
+      <div class="card-body">${body}</div>
+    </section>`;
 }
 
 function renderGroupCard(title, items, extraRows = '') {
@@ -121,7 +173,7 @@ function renderCpiRow(cpi) {
   const { cls, icon } = changeIcon(cpi.changePP);
   const ppText = typeof cpi.changePP === 'number' ? `${cpi.changePP >= 0 ? '+' : ''}${cpi.changePP.toFixed(2)} p.p.` : '—';
   return `
-    <div class="row">
+    <div class="row rate-row">
       <div class="row-label">
         <span class="row-name">CPI</span>
         <span class="row-symbol">${cpi.refDate || 'CPI'}</span>
@@ -284,8 +336,13 @@ function render(data) {
   const usIdx = groupTitles.indexOf('Estados Unidos');
   if (usIdx !== -1) cards.push(renderGroupCard('Estados Unidos', data.groups['Estados Unidos'], renderCpiRow(data.cpi)));
 
+  // Brasil e Índices Mundiais ficam juntos (a tabela de índices vem logo abaixo)
   const brIdx = groupTitles.indexOf('Brasil');
-  if (brIdx !== -1) cards.push(renderGroupCard('Brasil', data.groups['Brasil'], renderBrasilRatesRows(data.brasilRates)));
+  if (brIdx !== -1) {
+    cards.push(
+      `<div class="brasil-group">${renderGroupCard('Brasil', data.groups['Brasil'], renderBrasilRatesRows(data.brasilRates))}${renderWorldIndicesCard(data.worldIndices)}</div>`
+    );
+  }
 
   for (const title of groupTitles) {
     if (title === 'Estados Unidos' || title === 'Brasil') continue;
@@ -346,7 +403,7 @@ grid.addEventListener('click', (e) => {
 const TV_MODE = new URLSearchParams(location.search).get('tv') === '1';
 const STAGE_W = 1920;
 const STAGE_H = 1080;
-const TV_NEWS_LIMIT = 5;        // menos manchetes na TV, porém com o título inteiro
+const TV_NEWS_LIMIT = 4;        // menos manchetes na TV, porém com o título inteiro
 const TV_AGENDA_LIMIT = 8;      // eventos da Agenda IBGE que cabem acima do calendário
                                 // (8 deixa margem para nomes longos quebrarem linha)
 const CAL_IFRAME_W = 650;       // dimensões nativas do widget do Investing
