@@ -14,6 +14,19 @@
 
 * { box-sizing: border-box; }
 
+/* âncora dos widgets sobrepostos (calendário/taxas), que ficam fora do #grid */
+#stage { position: relative; }
+
+.rates-band { position: absolute; }
+.rates-group { break-inside: avoid; }
+.rates-widget-wrap { overflow: hidden; }
+.rates-widget-wrap iframe {
+  width: 108px;
+  height: 146px;
+  border: 0;
+  transform-origin: top left;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;

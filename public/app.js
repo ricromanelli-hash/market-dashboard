@@ -203,6 +203,53 @@ function ensureCalendarWidget() {
     </section>`;
 }
 
+// Widget de taxas de juros do Investing.com (108x146 nativo). Mesmo esquema do
+// calendário: montado uma vez fora do #grid e sobreposto ao slot correspondente.
+const INVESTING_RATES_SRC = 'https://sslirates.investing.com/index.php?rows=1&bg1=FFFFFF&bg2=F1F5F8&text_color=333333&enable_border=show&border_color=0452A1&header_bg=0452A1&header_text=FFFFFF&force_lang=12';
+const RATES_IFRAME_W = 108;
+const RATES_IFRAME_H = 146;
+const RATES_MAX_SCALE = 1.2; // esticar até a coluna (2,4x) deixaria o card alto demais
+
+function ensureRatesWidget() {
+  const host = document.getElementById('ratesWidget');
+  if (!host || host.dataset.mounted) return;
+  host.dataset.mounted = '1';
+  host.innerHTML = `
+    <section class="card rates-widget-card">
+      <div class="card-header">Taxas de Juros</div>
+      <div class="rates-widget-wrap">
+        <iframe title="Taxas de Juros — Investing.com" src="${INVESTING_RATES_SRC}"
+          width="${RATES_IFRAME_W}" height="${RATES_IFRAME_H}" frameborder="0"
+          scrolling="no" allowtransparency="true" marginwidth="0" marginheight="0"></iframe>
+      </div>
+      <div class="cal-footer">
+        Taxas fornecidas por
+        <a href="https://br.investing.com/" rel="nofollow" target="_blank">Investing.com Brasil</a>.
+      </div>
+    </section>`;
+}
+
+// Sobrepõe um widget persistente ao seu slot no grid, escalando-o para a largura da
+// coluna. `maxScale` evita que widgets estreitos e altos (como o de taxas) fiquem
+// altos demais ao esticar; nesse caso o iframe é centralizado na coluna.
+function positionWidget(hostId, slotId, nativeW, nativeH, maxScale = Infinity) {
+  const host = document.getElementById(hostId);
+  const slot = document.getElementById(slotId);
+  if (!host || !slot) return;
+  const iframe = host.querySelector('iframe');
+  const wrap = host.querySelector('.cal-widget-wrap, .rates-widget-wrap');
+  if (!iframe || !wrap) return;
+  const colW = slot.offsetWidth || host.offsetWidth;
+  const scale = Math.min(colW / nativeW, maxScale);
+  const offsetX = Math.max(0, (colW - nativeW * scale) / 2); // centraliza se sobrar espaço
+  iframe.style.transform = `translateX(${offsetX}px) scale(${scale})`;
+  wrap.style.height = `${Math.round(nativeH * scale)}px`;
+  host.style.width = `${colW}px`;
+  slot.style.height = `${host.offsetHeight}px`;
+  host.style.top = `${slot.offsetTop}px`;
+  host.style.left = `${slot.offsetLeft}px`;
+}
+
 async function loadData() {
   try {
     const res = await fetch('/api/data', { cache: 'no-store' });
@@ -230,7 +277,10 @@ function render(data) {
     // Commodities and calendar are placed right after Brasil-related cards, matching original layout
   }
 
-  if (groupTitles.includes('Commodities')) cards.push(renderGroupCard('Commodities', data.groups['Commodities']));
+  // Commodities + slot das taxas de juros ficam juntos (o widget é sobreposto ao slot)
+  if (groupTitles.includes('Commodities')) {
+    cards.push(`<div class="rates-group">${renderGroupCard('Commodities', data.groups['Commodities'])}<div id="ratesSlot" class="rates-slot"></div></div>`);
+  }
 
   // No modo TV, Agenda IBGE e calendário vão para o painel lateral (650px), onde o
   // widget do Investing cabe em tamanho nativo. O slot apenas reserva o espaço — o
@@ -258,8 +308,8 @@ function render(data) {
 
   grid.innerHTML = cards.join('');
 
-  // o grid foi reconstruído: realinha o calendário sobre o novo slot
-  if (TV_MODE) positionCalWidget();
+  // o grid foi reconstruído: realinha os widgets persistentes sobre os novos slots
+  positionCalWidget();
 
   if (data.updatedAt) {
     updatedAtEl.textContent = `Atualizado às ${timeFmt.format(new Date(data.updatedAt))}`;
@@ -301,24 +351,8 @@ function fitStage() {
 // Mover o iframe no DOM o recarregaria; por isso ele fica fixo em #calWidget (filho
 // de #stage) e apenas reposicionamos via top/left — o iframe nunca é recriado.
 function positionCalWidget() {
-  const host = document.getElementById('calWidget');
-  const slot = document.getElementById('calSlot');
-  if (!host || !slot) return;
-  const iframe = host.querySelector('iframe');
-  const wrap = host.querySelector('.cal-widget-wrap');
-  if (!iframe || !wrap) return;
-
-  // 1) escala o iframe para a largura da coluna e reserva a altura correspondente
-  const colW = slot.offsetWidth || host.offsetWidth;
-  const scale = colW / CAL_IFRAME_W;
-  iframe.style.transform = `scale(${scale})`;
-  wrap.style.height = `${Math.round(CAL_IFRAME_H * scale)}px`;
-  host.style.width = `${colW}px`;
-
-  // 2) o slot reserva no fluxo a altura real do card, e então alinhamos por cima
-  slot.style.height = `${host.offsetHeight}px`;
-  host.style.top = `${slot.offsetTop}px`;
-  host.style.left = `${slot.offsetLeft}px`;
+  positionWidget('calWidget', 'calSlot', CAL_IFRAME_W, CAL_IFRAME_H);
+  positionWidget('ratesWidget', 'ratesSlot', RATES_IFRAME_W, RATES_IFRAME_H, RATES_MAX_SCALE);
 }
 
 if (TV_MODE) {
@@ -327,6 +361,7 @@ if (TV_MODE) {
   window.addEventListener('resize', fitStage);
 }
 
-ensureCalendarWidget(); // o iframe é montado uma vez nos dois modos
+ensureCalendarWidget(); // os iframes são montados uma vez nos dois modos
+ensureRatesWidget();
 loadData();
 setInterval(loadData, 30_000);
