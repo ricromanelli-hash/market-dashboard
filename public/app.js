@@ -22,10 +22,21 @@ function changeIcon(pct) {
   return { cls: 'flat', icon: '—' };
 }
 
+// Logo da empresa via brapi (só ações da B3: PETR4.SA -> icons.brapi.dev/icons/PETR4.svg).
+// Alguns tickers não têm ícone (ex.: AXIA3, PASS3); nesse caso escondemos a imagem
+// mantendo o espaço, para os nomes continuarem alinhados na coluna.
+function logoImg(symbol) {
+  if (!symbol || !symbol.endsWith('.SA')) return '';
+  const ticker = symbol.slice(0, -3);
+  return `<img class="row-logo" src="https://icons.brapi.dev/icons/${ticker}.svg" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`;
+}
+
 function renderQuoteRow(item) {
+  const logo = logoImg(item.symbol);
   if (item.error) {
     return `
       <div class="row">
+        ${logo}
         <div class="row-label">
           <span class="row-name">${item.label}</span>
           <span class="row-symbol">${item.displaySymbol || item.symbol}</span>
@@ -37,6 +48,7 @@ function renderQuoteRow(item) {
   const pctText = typeof item.changePct === 'number' ? `${item.changePct >= 0 ? '+' : ''}${item.changePct.toFixed(2)}%` : '—';
   return `
     <div class="row">
+      ${logo}
       <div class="row-label">
         <span class="row-name">${item.label}</span>
         <span class="row-symbol">${item.displaySymbol || item.symbol}</span>
