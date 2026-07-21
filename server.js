@@ -44,7 +44,7 @@ const GROUPS = [
   { title: 'Seguros', items: [
     { symbol: 'BBSE3.SA', label: 'BB' },
     { symbol: 'CXSE3.SA', label: 'Caixa' },
-    { symbol: 'PSSA3.SA', label: 'Porto Seguros' },
+    { symbol: 'PSSA3.SA', label: 'Porto' },
     { symbol: 'IRBR3.SA', label: 'IRB' },
   ]},
   { title: 'Energia', items: [
