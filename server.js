@@ -67,6 +67,7 @@ const GROUPS = [
   { title: 'Mineração', items: [
     { symbol: 'VALE3.SA', label: 'VALE' },
     { symbol: 'BRAP4.SA', label: 'Bradespar' },
+    { symbol: 'CMIN3.SA', label: 'CSN Mineração' },
   ]},
   { title: 'Petróleo & Gás', items: [
     { symbol: 'PETR4.SA', label: 'Petrobras' },
