@@ -81,8 +81,8 @@ body.tv-mode .pair-group > .card { margin-bottom: 10px; }
    seu conteúdo, o que desalinhava as colunas (o "—" do 30a é bem mais estreito). */
 .rr-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) repeat(4, 36px) 42px;
-  gap: 4px;
+  grid-template-columns: 18px minmax(0, 1fr) repeat(4, 34px) 40px;
+  gap: 3px;
   align-items: center;
   padding: 4px 9px;
   border-bottom: 1px solid #f0f2ef;
@@ -99,6 +99,14 @@ body.tv-mode .pair-group > .card { margin-bottom: 10px; }
 }
 .rr-head span { text-align: right; }
 .rr-head .rr-pais { text-align: left; }
+
+.rr-flag {
+  width: 18px;
+  height: 13px;
+  object-fit: cover;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
 
 .rr-pais {
   font-weight: 600;

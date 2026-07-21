@@ -113,10 +113,7 @@ function renderWorldIndicesCard(regions) {
   }
   const body = regions.map((r) => {
     const rows = (r.items || []).map((it) => {
-      // bandeira do país da bolsa (flagcdn); emoji não renderiza em Windows/TVs
-      const flag = it.flag
-        ? `<img class="idx-flag" src="https://flagcdn.com/w40/${it.flag}.png" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`
-        : '<span class="idx-flag"></span>';
+      const flag = flagImg(it.flag);
       if (it.error || typeof it.price !== 'number') {
         return `<div class="row idx-row">${flag}<span class="idx-name">${it.label}</span>
           <div class="row-unavailable">indisponível</div></div>`;
@@ -144,21 +141,29 @@ function renderWorldIndicesCard(regions) {
     </section>`;
 }
 
+// Bandeira do país (flagcdn). Emoji de bandeira não renderiza no Windows nem em
+// muitos navegadores de TV — apareceria só a sigla ("BR"), por isso usamos imagem.
+function flagImg(code, cls = 'idx-flag') {
+  if (!code) return `<span class="${cls}"></span>`;
+  return `<img class="${cls}" src="https://flagcdn.com/w40/${code}.png" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`;
+}
+
 // Juros reais por país: taxa básica (BIS) x inflação 12m (OCDE), fórmula de Fisher.
 function renderRealRatesCard(rows) {
   if (!rows || rows.length === 0) {
     return `<section class="card"><div class="card-header">Juros Reais</div>
       <div class="card-body"><p class="row-unavailable" style="padding:12px">carregando…</p></div></section>`;
   }
-  const head = `<div class="rr-row rr-head"><span class="rr-pais">País</span><span>Taxa</span><span>Infl.</span><span title="título de 10 anos">10a</span><span title="título de 30 anos (só EUA tem série pública)">30a</span><span>Real</span></div>`;
+  const head = `<div class="rr-row rr-head"><span class="rr-flag"></span><span class="rr-pais">País</span><span>Taxa</span><span>Infl.</span><span title="título de 10 anos">10a</span><span title="título de 30 anos (só EUA tem série pública)">30a</span><span>Real</span></div>`;
   const num = (v) => (typeof v === 'number' ? v.toFixed(2) : '—');
   const body = rows.map((r) => {
     if (r.unavailable) {
-      return `<div class="rr-row"><span class="rr-pais">${r.label}</span><span class="rr-na">indisponível</span></div>`;
+      return `<div class="rr-row">${flagImg(r.flag, 'rr-flag')}<span class="rr-pais">${r.label}</span><span class="rr-na">indisponível</span></div>`;
     }
     const cls = r.real > 0 ? 'up' : (r.real < 0 ? 'down' : 'flat');
     return `
       <div class="rr-row">
+        ${flagImg(r.flag, 'rr-flag')}
         <span class="rr-pais" title="inflação de ${r.period}">${r.label}</span>
         <span class="rr-num">${r.policy.toFixed(2)}</span>
         <span class="rr-num">${r.inflation.toFixed(2)}</span>

@@ -127,14 +127,14 @@ const WORLD_INDICES = [
 // `y30`: título de 30 anos. Só os EUA têm série pública gratuita (Yahoo ^TYX) —
 // a OCDE cobre apenas curto prazo, 3 meses e longo prazo (10 anos, medida IRLT).
 const REAL_RATE_COUNTRIES = [
-  { label: 'Brasil', bis: 'BR', oecd: 'BRA' },
-  { label: 'Colômbia', bis: 'CO', oecd: 'COL' },
-  { label: 'R. Unido', bis: 'GB', oecd: 'GBR' },
-  { label: 'Austrália', bis: 'AU', oecd: 'AUS' },
-  { label: 'EUA', bis: 'US', oecd: 'USA', y30: '^TYX' },
-  { label: 'Alemanha', bis: 'XM', oecd: 'DEU' },
-  { label: 'Canadá', bis: 'CA', oecd: 'CAN' },
-  { label: 'Z. Euro', bis: 'XM', oecd: 'EA20' },
+  { label: 'Brasil', bis: 'BR', oecd: 'BRA', flag: 'br' },
+  { label: 'Colômbia', bis: 'CO', oecd: 'COL', flag: 'co' },
+  { label: 'R. Unido', bis: 'GB', oecd: 'GBR', flag: 'gb' },
+  { label: 'Austrália', bis: 'AU', oecd: 'AUS', flag: 'au' },
+  { label: 'EUA', bis: 'US', oecd: 'USA', y30: '^TYX', flag: 'us' },
+  { label: 'Alemanha', bis: 'XM', oecd: 'DEU', flag: 'de' },
+  { label: 'Canadá', bis: 'CA', oecd: 'CAN', flag: 'ca' },
+  { label: 'Z. Euro', bis: 'XM', oecd: 'EA20', flag: 'eu' },
 ];
 // Juros de 10 anos (medida IRLT). Essa base rejeita consultas com chave específica,
 // então baixamos o dataset inteiro (~80KB) e filtramos aqui.
@@ -506,7 +506,7 @@ async function refreshRealRates() {
   cache.realRates = REAL_RATE_COUNTRIES.map((c) => {
     const p = policy.get(c.bis);
     const inf = inflation.get(c.oecd);
-    if (!p || !inf) return { label: c.label, unavailable: true };
+    if (!p || !inf) return { label: c.label, flag: c.flag, unavailable: true };
     const real = ((1 + p.value / 100) / (1 + inf.value / 100) - 1) * 100;
     // Brasil: prefixado do Tesouro (nominal). A série da OCDE não confere com a
     // curva local, então nunca caímos de volta nela para o Brasil.
@@ -514,6 +514,7 @@ async function refreshRealRates() {
     const y30 = y30Map.get(c.oecd);
     return {
       label: c.label,
+      flag: c.flag,
       policy: +p.value.toFixed(2),
       inflation: +inf.value.toFixed(2),
       real: +real.toFixed(2),
