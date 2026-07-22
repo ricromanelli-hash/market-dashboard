@@ -332,6 +332,9 @@ body {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+/* o valor acompanha a cor da variação do dia */
+.hl-value.up { color: var(--green-up); }
+.hl-value.down { color: var(--red-down); }
 .hl-na { color: var(--text-muted); }
 
 /* na TV o card cresce mais: é o ponto de leitura à distância */

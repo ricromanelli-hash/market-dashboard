@@ -181,7 +181,7 @@ function renderHighlightsCard(data) {
           <span class="hl-label">${h.label}</span>
           <span class="hl-pct ${up ? 'up' : 'down'}">${pct}</span>
         </div>
-        <div class="hl-value">${h.fmt(it.price)}</div>
+        <div class="hl-value ${up ? 'up' : 'down'}">${h.fmt(it.price)}</div>
       </div>`;
   }).join('');
   return `
