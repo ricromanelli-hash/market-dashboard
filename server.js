@@ -104,6 +104,7 @@ const GROUPS = [
     { symbol: 'TOTS3.SA', label: 'Totvs' },
     { symbol: 'VBBR3.SA', label: 'Vibra' },
     { symbol: 'UGPA3.SA', label: 'Ultrapar' },
+    { symbol: 'SAUD3.SA', label: 'Bradesco Saúde' },
   ]},
 ];
 

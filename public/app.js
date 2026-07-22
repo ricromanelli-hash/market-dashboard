@@ -352,7 +352,7 @@ function cardBuilders(data) {
     'AgendaIBGE': () => renderCalendarCard(data.calendar, TV_MODE ? TV_AGENDA_LIMIT : undefined),
     'CalendarioEconomico': () => '<div id="calSlot" class="cal-slot"></div>',
     'NoticiasMacro': () => renderNewsCard(data.macroNews, 'Notícias — Indicadores Macro', newsLimit),
-    'NoticiasEmpresas': () => renderMainNewsCard(data, newsLimit),
+    'NoticiasEmpresas': () => renderMainNewsCard(data, TV_MODE ? TV_MAIN_NEWS_LIMIT : undefined),
   };
   // demais setores vêm direto do backend
   for (const title of Object.keys(g)) {
@@ -419,6 +419,7 @@ const TV_MODE = new URLSearchParams(location.search).get('tv') === '1';
 const STAGE_W = 1920;
 const STAGE_H = 1080;
 const TV_NEWS_LIMIT = 3;        // menos manchetes na TV, porém com o título inteiro
+const TV_MAIN_NEWS_LIMIT = 4;   // o card de empresas cabe uma manchete a mais
 const TV_AGENDA_LIMIT = 5;      // eventos da Agenda IBGE que cabem acima do calendário
 const CAL_IFRAME_W = 650;       // dimensões nativas do widget do Investing
 const CAL_IFRAME_H = 467;
