@@ -89,6 +89,20 @@ const GROUPS = [
     { symbol: 'UNIP6.SA', label: 'Unipar' },
     { symbol: 'BRKM3.SA', label: 'Braskem' },
   ]},
+  { title: 'Outros', items: [
+    { symbol: 'WEGE3.SA', label: 'WEG' },
+    { symbol: 'LEVE3.SA', label: 'Metal Leve' },
+    { symbol: 'MYPK3.SA', label: 'Iochpe Maxion' },
+    { symbol: 'ROMI3.SA', label: 'Romi' },
+    { symbol: 'TUPY3.SA', label: 'Tupy' },
+    { symbol: 'RADL3.SA', label: 'Raia Drogasil' },
+    { symbol: 'FESA4.SA', label: 'Ferbasa' },
+    { symbol: 'SLCE3.SA', label: 'SLC' },
+    { symbol: 'ABEV3.SA', label: 'Ambev' },
+    { symbol: 'TOTS3.SA', label: 'Totvs' },
+    { symbol: 'VBBR3.SA', label: 'Vibra' },
+    { symbol: 'UGPA3.SA', label: 'Ultrapar' },
+  ]},
 ];
 
 // Índices mundiais por região, com mini-gráfico de 2 dias (formato "world indices").

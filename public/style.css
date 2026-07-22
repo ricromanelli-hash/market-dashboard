@@ -467,7 +467,7 @@ body.tv-mode .card {
 
 /* tamanhos calibrados para leitura de longe, preenchendo a tela de 1080p */
 body.tv-mode .card-header { font-size: 14.5px; padding: 5px 9px; }
-body.tv-mode .row { padding: 5px 9px; font-size: 14px; }
+body.tv-mode .row { padding: 4px 9px; font-size: 14px; }
 body.tv-mode .row-name { font-weight: 600; }
 body.tv-mode .row-logo { width: 22px; height: 22px; flex-basis: 22px; }
 /* Numa TV o ticker (e a data de referência) não compensam a linha extra: com o logo
