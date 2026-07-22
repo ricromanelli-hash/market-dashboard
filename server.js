@@ -325,6 +325,40 @@ async function fetchIndexQuote(symbol) {
   return { price, changePct, spark };
 }
 
+// Histórico de 12 meses (semanal) para o mini-gráfico de tendência ao lado de cada
+// ação. Fica no ciclo lento: um gráfico anual não muda no intraday, e assim evitamos
+// ~53 requisições extras a cada 30s.
+const historySpark = new Map(); // symbol -> número[]
+
+async function fetchYearSpark(symbol) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1wk&range=1y`;
+  const res = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(20000) });
+  if (!res.ok) throw new Error(`Yahoo hist ${symbol}: HTTP ${res.status}`);
+  const json = await res.json();
+  const closes = (json?.chart?.result?.[0]?.indicators?.quote?.[0]?.close || [])
+    .filter((c) => typeof c === 'number');
+  if (closes.length < 2) throw new Error(`Yahoo hist ${symbol}: série curta`);
+  return downsample(closes, 40).map((n) => +n.toFixed(2));
+}
+
+async function refreshHistory() {
+  const symbols = [];
+  for (const group of GROUPS) {
+    for (const item of group.items) {
+      if (item.symbol.endsWith('.SA')) symbols.push(item.symbol); // só ações da B3
+    }
+  }
+  let falhas = 0;
+  await mapWithConcurrency(symbols, 5, async (symbol) => {
+    try {
+      historySpark.set(symbol, await fetchYearSpark(symbol));
+    } catch {
+      falhas += 1; // mantém o histórico anterior, se houver
+    }
+  });
+  if (falhas === symbols.length) throw new Error('Histórico 12m: todas as ações falharam');
+}
+
 async function mapWithConcurrency(items, limit, fn) {
   const results = new Array(items.length);
   let idx = 0;
@@ -346,7 +380,7 @@ async function refreshMarketData() {
   for (const group of GROUPS) {
     const results = await mapWithConcurrency(group.items, 6, async (item) => {
       const quote = await fetchQuote(item.symbol);
-      return { ...item, ...quote };
+      return { ...item, ...quote, spark: historySpark.get(item.symbol) || null };
     });
     cache.groups[group.title] = results;
   }
@@ -793,6 +827,7 @@ async function refreshSlowData() {
     refreshCpi(),
     refreshRealRates(),
     refreshDiFutures(),
+    refreshHistory(),
     refreshNews(),
     refreshMacroNews(),
     refreshCompanyNews(),

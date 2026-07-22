@@ -46,6 +46,10 @@ function renderQuoteRow(item) {
   }
   const { cls, icon } = changeIcon(item.changePct);
   const pctText = typeof item.changePct === 'number' ? `${item.changePct >= 0 ? '+' : ''}${item.changePct.toFixed(2)}%` : '—';
+  // tendência de 12 meses: verde/vermelho conforme o saldo do período
+  const trend = item.spark && item.spark.length > 1
+    ? `<span class="row-spark" title="tendência de 12 meses">${sparkline(item.spark, item.spark[item.spark.length - 1] >= item.spark[0])}</span>`
+    : '';
   return `
     <div class="row">
       ${logo}
@@ -53,6 +57,7 @@ function renderQuoteRow(item) {
         <span class="row-name">${item.label}</span>
         <span class="row-symbol">${item.displaySymbol || item.symbol}</span>
       </div>
+      ${trend}
       <div class="row-values">
         <span class="row-price">${formatPrice(item.price, item.currency)}</span>
         <span class="row-change ${cls}">${icon} ${pctText}</span>

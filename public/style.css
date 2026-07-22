@@ -295,6 +295,19 @@ body {
   flex: 1;
 }
 
+/* mini-gráfico de tendência de 12 meses, entre o nome e a cotação */
+.row-spark {
+  flex: 0 0 32px;
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.85;
+}
+.row-spark svg {
+  flex: none;
+  width: 32px;
+  height: 14px;
+}
+
 /* logo da empresa (brapi) à esquerda do nome */
 .row-logo {
   width: 20px;
