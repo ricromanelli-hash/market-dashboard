@@ -30,6 +30,10 @@ const GROUPS = [
     { symbol: 'GC=F', label: 'Ouro' },
     { symbol: 'CL=F', label: 'Petróleo WTI' },
     { symbol: 'BZ=F', label: 'Petróleo Brent' },
+    // Índice TSI (não é futuro negociado): o campo de cotação do Yahoo está congelado
+    // em 2021, então `fromSeries` faz ler o preço do último fechamento da série.
+    { symbol: 'TIO=F', label: 'Minério de Ferro', fromSeries: true },
+    { symbol: 'HRC=F', label: 'Aço Laminado', fromSeries: true },
   ]},
   { title: 'Bancos', items: [
     { symbol: 'ITUB3.SA', label: 'Itaú' },
@@ -276,15 +280,41 @@ const FOLLOWED_COMPANIES = (() => {
   }));
 })();
 
-async function fetchQuote(symbol) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`;
+// `fromSeries`: usa o último fechamento da série em vez de meta.regularMarketPrice.
+// Necessário para índices como o TIO=F (minério), cujo campo de cotação do Yahoo está
+// parado em 2021 embora a série diária continue atualizada. Devolve também a data
+// desse fechamento, para o painel deixar claro que não é preço intradiário.
+async function fetchQuote(symbol, fromSeries = false) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=10d`;
   const res = await fetch(url, { headers: { 'User-Agent': UA } });
   if (!res.ok) throw new Error(`Yahoo ${symbol}: HTTP ${res.status}`);
   const json = await res.json();
   const result = json?.chart?.result?.[0];
   const meta = result?.meta;
-  if (!meta || typeof meta.regularMarketPrice !== 'number') {
-    throw new Error(`Yahoo ${symbol}: sem dados retornados`);
+  if (!meta) throw new Error(`Yahoo ${symbol}: sem dados retornados`);
+
+  if (fromSeries) {
+    const stamps = result?.timestamp || [];
+    const raw = result?.indicators?.quote?.[0]?.close || [];
+    const pts = [];
+    for (let i = 0; i < raw.length; i++) {
+      if (typeof raw[i] === 'number') pts.push({ close: raw[i], ts: stamps[i] });
+    }
+    if (pts.length === 0) throw new Error(`Yahoo ${symbol}: série vazia`);
+    const last = pts[pts.length - 1];
+    const prev = pts.length > 1 ? pts[pts.length - 2].close : null;
+    const d = new Date(last.ts * 1000);
+    const refDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+    return {
+      price: last.close,
+      changePct: prev ? ((last.close - prev) / prev) * 100 : 0,
+      currency: meta.currency ?? null,
+      refDate, // marca que o valor é de fechamento
+    };
+  }
+
+  if (typeof meta.regularMarketPrice !== 'number') {
+    throw new Error(`Yahoo ${symbol}: sem preço`);
   }
   const price = meta.regularMarketPrice;
   // meta.chartPreviousClose NÃO é o fechamento da sessão anterior — é o fechamento
@@ -379,7 +409,7 @@ async function mapWithConcurrency(items, limit, fn) {
 async function refreshMarketData() {
   for (const group of GROUPS) {
     const results = await mapWithConcurrency(group.items, 6, async (item) => {
-      const quote = await fetchQuote(item.symbol);
+      const quote = await fetchQuote(item.symbol, item.fromSeries);
       return { ...item, ...quote, spark: historySpark.get(item.symbol) || null };
     });
     cache.groups[group.title] = results;

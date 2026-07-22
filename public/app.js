@@ -54,7 +54,7 @@ function renderQuoteRow(item) {
     <div class="row">
       ${logo}
       <div class="row-label">
-        <span class="row-name">${item.label}</span>
+        <span class="row-name">${item.label}${item.refDate ? `<span class="row-note" title="não é preço intradiário: último fechamento disponível">fech. ${item.refDate}</span>` : ''}</span>
         <span class="row-symbol">${item.displaySymbol || item.symbol}</span>
       </div>
       ${trend}

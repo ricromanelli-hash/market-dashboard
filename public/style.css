@@ -343,6 +343,19 @@ body.tv-mode .hl-label { font-size: 14px; }
 body.tv-mode .hl-pct { font-size: 16px; }
 body.tv-mode .hl-value { font-size: 38px; }
 
+/* marca "fech. dd/mm" — segue visível no modo TV, ao contrário do ticker */
+.row-note {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: #eef2ee;
+  border-radius: 3px;
+  padding: 1px 4px;
+  white-space: nowrap;
+}
+body.tv-mode .row-note { font-size: 9.5px; }
+
 /* mini-gráfico de tendência de 12 meses, entre o nome e a cotação */
 .row-spark {
   flex: 0 0 32px;
