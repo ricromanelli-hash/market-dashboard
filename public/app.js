@@ -364,12 +364,10 @@ function cardBuilders(data) {
 // Layout fixo do modo TV: cada array é uma coluna, na ordem definida pelo usuário.
 // A última coluna é mais larga para acomodar o calendário do Investing.
 const TV_LAYOUT = [
-  // Mineração ficou na coluna 1 (que tinha ~345px livres) para o grupo "Outros"
-  // caber na coluna 4 logo abaixo de Químicos & Petroquímicos.
-  ['Estados Unidos', 'Brasil', 'Mineração'],
+  ['Estados Unidos', 'Brasil'],
   ['Commodities', 'IndicesMundiais', 'JurosReais'],
   ['Bancos', 'Energia', 'Seguros', 'Saneamento', 'Telecom'],
-  ['Petróleo & Gás', 'Papel & Celulose', 'Metalurgia & Siderurgia', 'Químicos & Petroquímicos', 'Outros'],
+  ['Mineração', 'Petróleo & Gás', 'Papel & Celulose', 'Metalurgia & Siderurgia', 'Químicos & Petroquímicos', 'Outros'],
   ['AgendaIBGE', 'CalendarioEconomico', 'NoticiasMacro', 'NoticiasEmpresas'],
 ];
 
