@@ -197,7 +197,7 @@ function renderRealRatesCard(rows) {
     return `<section class="card"><div class="card-header">Juros Reais</div>
       <div class="card-body"><p class="row-unavailable" style="padding:12px">carregando…</p></div></section>`;
   }
-  const head = `<div class="rr-row rr-head"><span class="rr-flag"></span><span class="rr-pais">País</span><span title="crescimento do PIB no último ano fechado">PIB</span><span title="taxa de desemprego (por ora só EUA)">Des.</span><span title="taxa básica de juros do banco central (Selic, Fed Funds, BCE...)">Básica</span><span>Infl.</span><span title="título de 10 anos">10a</span><span title="título de 30 anos (só EUA tem série pública)">30a</span><span>Real</span></div>`;
+  const head = `<div class="rr-row rr-head"><span class="rr-flag"></span><span class="rr-pais">País</span><span title="crescimento do PIB no último ano fechado">PIB</span><span title="taxa de desemprego (por ora só EUA)">Des.</span><span title="taxa básica de juros do banco central (Selic, Fed Funds, BCE...)">Básica</span><span>Infl.</span><span title="título de 10 anos">10a</span><span>Real</span></div>`;
   const num = (v) => (typeof v === 'number' ? v.toFixed(2) : '—');
   const body = rows.map((r) => {
     if (r.unavailable) {
@@ -213,7 +213,6 @@ function renderRealRatesCard(rows) {
         <span class="rr-num">${r.policy.toFixed(2)}</span>
         <span class="rr-num">${r.inflation.toFixed(2)}</span>
         <span class="rr-num">${num(r.y10)}</span>
-        <span class="rr-num">${num(r.y30)}</span>
         <span class="rr-num rr-real ${cls}">${r.real >= 0 ? '+' : ''}${r.real.toFixed(2)}</span>
       </div>`;
   }).join('');

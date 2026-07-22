@@ -561,7 +561,8 @@ let lastUnempFetch = 0;
 let usUnemployment = null; // { value, date }
 
 async function refreshUnemployment() {
-  if (!ALPHA_KEY) return; // sem chave configurada: coluna fica como "—"
+  // falha explícita: sem isso a coluna some sem explicação e é difícil diagnosticar
+  if (!ALPHA_KEY) throw new Error('Desemprego EUA: falta a variável ALPHAVANTAGE_KEY (Render → Environment)');
   if (usUnemployment && Date.now() - lastUnempFetch < UNEMP_MIN_INTERVAL_MS) return;
   const url = `https://www.alphavantage.co/query?function=UNEMPLOYMENT&apikey=${ALPHA_KEY}`;
   const data = await fetchJsonWithRetry(url, 'Alpha Vantage desemprego', 2, 30000);

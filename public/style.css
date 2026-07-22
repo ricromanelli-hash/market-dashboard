@@ -81,7 +81,7 @@ body.tv-mode .pair-group > .card { margin-bottom: 10px; }
    seu conteúdo, o que desalinhava as colunas (o "—" do 30a é bem mais estreito). */
 .rr-row {
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) repeat(6, 34px) 40px;
+  grid-template-columns: 18px minmax(0, 1fr) repeat(5, 34px) 40px;
   gap: 3px;
   align-items: center;
   padding: 4px 9px;
@@ -112,6 +112,9 @@ body.tv-mode .rr-card { grid-column: auto; }
   border-radius: 2px;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
 }
+
+/* respiro entre a bandeira e o nome do país */
+.rr-pais { padding-left: 6px; }
 
 .rr-pais {
   font-weight: 600;
@@ -526,11 +529,12 @@ body.tv-mode .tv-col-wide {
 
 /* tabela de juros reais na TV */
 body.tv-mode .rr-row {
-  padding: 6px 6px;
-  font-size: 10px;
-  /* PIB · Des. · Básica · Infl. · 10a · 30a · Real — as duas de rótulo maior ganham folga */
-  grid-template-columns: 16px minmax(0, 1fr) 27px 27px 32px 30px 27px 27px 33px;
-  gap: 2px;
+  padding: 6px 8px;
+  font-size: 11px; /* sem a coluna de 30a deu para voltar a crescer */
+  /* PIB · Des. · Básica · Infl. · 10a · Real */
+  /* 18px = largura real da bandeira; menos que isso ela invade o respiro do nome */
+  grid-template-columns: 18px minmax(0, 1fr) 30px 30px 34px 32px 30px 36px;
+  gap: 3px;
 }
 body.tv-mode .rr-head { font-size: 9.5px; }
 body.tv-mode .tv-col > * { margin-bottom: 10px; }
