@@ -71,6 +71,8 @@ const GROUPS = [
   ]},
   { title: 'Petróleo & Gás', items: [
     { symbol: 'PETR4.SA', label: 'Petrobras' },
+    { symbol: 'PRIO3.SA', label: 'Prio' },
+    { symbol: 'RECV3.SA', label: 'Recôncavo' },
     { symbol: 'PASS3.SA', label: 'Compass' },
     { symbol: 'CGAS5.SA', label: 'Compass Gás' },
   ]},

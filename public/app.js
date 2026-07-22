@@ -366,8 +366,8 @@ function cardBuilders(data) {
 const TV_LAYOUT = [
   ['Estados Unidos', 'Brasil'],
   ['Commodities', 'IndicesMundiais', 'JurosReais'],
-  ['Bancos', 'Energia', 'Seguros', 'Saneamento', 'Telecom'],
-  ['Mineração', 'Petróleo & Gás', 'Papel & Celulose', 'Metalurgia & Siderurgia', 'Químicos & Petroquímicos', 'Outros'],
+  ['Bancos', 'Energia', 'Seguros', 'Saneamento', 'Telecom', 'Petróleo & Gás'],
+  ['Mineração', 'Papel & Celulose', 'Metalurgia & Siderurgia', 'Químicos & Petroquímicos', 'Outros'],
   ['AgendaIBGE', 'CalendarioEconomico', 'NoticiasMacro', 'NoticiasEmpresas'],
 ];
 
