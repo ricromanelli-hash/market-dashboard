@@ -17,6 +17,17 @@ npm start
 
 Depois abra http://localhost:3000 no navegador.
 
+### Variável de ambiente (opcional)
+
+`ALPHAVANTAGE_KEY` — chave do [Alpha Vantage](https://www.alphavantage.co/), usada só
+para a taxa de desemprego dos EUA na tabela de Juros Reais. **Nunca coloque a chave no
+código**: o repositório é público. Sem ela, a coluna simplesmente fica vazia.
+
+- Local: `$env:ALPHAVANTAGE_KEY = "sua-chave"` antes de `npm start`
+- Render: *Dashboard → seu serviço → Environment → Add Environment Variable*
+
+O plano gratuito permite 25 requisições/dia, por isso o valor é cacheado por 12 horas.
+
 ## Publicar na nuvem (Render — grátis)
 
 O app já está pronto para deploy (usa `process.env.PORT`, sem banco e sem build).

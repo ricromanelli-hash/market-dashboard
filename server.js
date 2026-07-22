@@ -155,8 +155,13 @@ const REAL_RATE_COUNTRIES = [
   { label: 'EUA', bis: 'US', oecd: 'USA', y30: '^TYX', flag: 'us' },
   { label: 'Alemanha', bis: 'XM', oecd: 'DEU', flag: 'de' },
   { label: 'Canadá', bis: 'CA', oecd: 'CAN', flag: 'ca' },
-  { label: 'Z. Euro', bis: 'XM', oecd: 'EA20', flag: 'eu' },
+  { label: 'Z. Euro', bis: 'XM', oecd: 'EA20', wb: 'EMU', flag: 'eu' },
 ];
+// PIB anual via World Bank Data360 (a API clássica do World Bank estava falhando em
+// 6 de 8 países; a Data360 devolve todos numa chamada, em ~1,5s).
+const WB_GDP_URL = 'https://data360api.worldbank.org/data360/data'
+  + '?DATABASE_ID=WB_WDI&INDICATOR=WB_WDI_NY_GDP_MKTP_KD_ZG&REF_AREA='
+  + REAL_RATE_COUNTRIES.map((c) => c.wb || c.oecd).join(',');
 // Juros de 10 anos (medida IRLT). Essa base rejeita consultas com chave específica,
 // então baixamos o dataset inteiro (~80KB) e filtramos aqui.
 const OECD_IRLT_URL = 'https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_FINMARK,4.0/'
@@ -547,6 +552,50 @@ async function fetchCsv(url, label) {
   return parseCsv(await res.text());
 }
 
+// Desemprego dos EUA (Alpha Vantage, mensal). A chave vem do ambiente — o repositório
+// é público, então ela nunca entra no código. Sem chave, a coluna fica vazia.
+// O plano gratuito permite 25 requisições/dia; como o dado é mensal, cacheamos 12h.
+const ALPHA_KEY = process.env.ALPHAVANTAGE_KEY || '';
+const UNEMP_MIN_INTERVAL_MS = 12 * 60 * 60 * 1000;
+let lastUnempFetch = 0;
+let usUnemployment = null; // { value, date }
+
+async function refreshUnemployment() {
+  if (!ALPHA_KEY) return; // sem chave configurada: coluna fica como "—"
+  if (usUnemployment && Date.now() - lastUnempFetch < UNEMP_MIN_INTERVAL_MS) return;
+  const url = `https://www.alphavantage.co/query?function=UNEMPLOYMENT&apikey=${ALPHA_KEY}`;
+  const data = await fetchJsonWithRetry(url, 'Alpha Vantage desemprego', 2, 30000);
+  if (data?.Note || data?.Information) {
+    throw new Error('Alpha Vantage: limite de requisições atingido');
+  }
+  const first = data?.data?.[0];
+  const v = parseFloat(first?.value);
+  if (!Number.isFinite(v)) throw new Error('Alpha Vantage: sem dado de desemprego');
+  usUnemployment = { value: +v.toFixed(1), date: String(first.date).slice(0, 7) };
+  lastUnempFetch = Date.now();
+}
+
+// PIB anual (crescimento %) dos 8 países, via World Bank Data360
+const gdpByCountry = new Map();
+
+async function refreshGdp() {
+  const data = await fetchJsonWithRetry(WB_GDP_URL, 'World Bank PIB', 2, 45000);
+  const rows = data?.value || [];
+  if (rows.length === 0) throw new Error('World Bank PIB: sem dados');
+  const latest = new Map();
+  for (const r of rows) {
+    const v = parseFloat(r.OBS_VALUE);
+    const year = String(r.TIME_PERIOD || '');
+    if (!Number.isFinite(v) || !year) continue;
+    const cur = latest.get(r.REF_AREA);
+    if (!cur || year > cur.year) latest.set(r.REF_AREA, { value: v, year });
+  }
+  gdpByCountry.clear();
+  for (const [area, info] of latest) {
+    gdpByCountry.set(area, { value: +info.value.toFixed(2), year: info.year });
+  }
+}
+
 // Juros reais pela fórmula de Fisher: (1+i)/(1+π) − 1
 async function refreshRealRates() {
   const [bisRows, oecdRows, irltRows, y30Map] = await Promise.all([
@@ -593,9 +642,15 @@ async function refreshRealRates() {
     // curva local, então nunca caímos de volta nela para o Brasil.
     const y10 = c.oecd === 'BRA' ? brasil10yNominal?.value : tenY.get(c.oecd);
     const y30 = y30Map.get(c.oecd);
+    const gdp = gdpByCountry.get(c.wb || c.oecd);
+    const unemp = c.oecd === 'USA' ? usUnemployment : null; // só os EUA por enquanto
     return {
       label: c.label,
       flag: c.flag,
+      gdp: gdp ? gdp.value : null,
+      gdpYear: gdp ? gdp.year : null,
+      unemp: unemp ? unemp.value : null,
+      unempDate: unemp ? unemp.date : null,
       policy: +p.value.toFixed(2),
       inflation: +inf.value.toFixed(2),
       real: +real.toFixed(2),
@@ -855,7 +910,16 @@ async function refreshSlowData() {
   const jobs = await Promise.allSettled([
     refreshIpca(),
     refreshCpi(),
-    refreshRealRates(),
+    // PIB e desemprego alimentam a tabela de juros reais, então vêm antes dela.
+    // Falhas neles não impedem a tabela: as colunas só ficam vazias.
+    (async () => {
+      const erros = [];
+      for (const job of [refreshGdp, refreshUnemployment]) {
+        try { await job(); } catch (e) { erros.push(e.message); }
+      }
+      await refreshRealRates();
+      if (erros.length) throw new Error(erros.join(' | '));
+    })(),
     refreshDiFutures(),
     refreshHistory(),
     refreshNews(),
