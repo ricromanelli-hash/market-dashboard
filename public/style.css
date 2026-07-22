@@ -295,6 +295,51 @@ body {
   flex: 1;
 }
 
+/* ---- Card "Destaques": números grandes, legíveis de longe ---- */
+.hl-item {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f0f2ef;
+}
+.hl-item:last-child { border-bottom: none; }
+
+.hl-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.hl-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.hl-pct {
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.hl-pct.up { color: var(--green-up); }
+.hl-pct.down { color: var(--red-down); }
+
+.hl-value {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.hl-na { color: var(--text-muted); }
+
+/* na TV o card cresce mais: é o ponto de leitura à distância */
+body.tv-mode .hl-item { padding: 9px 12px; }
+body.tv-mode .hl-label { font-size: 14px; }
+body.tv-mode .hl-pct { font-size: 16px; }
+body.tv-mode .hl-value { font-size: 38px; }
+
 /* mini-gráfico de tendência de 12 meses, entre o nome e a cotação */
 .row-spark {
   flex: 0 0 32px;

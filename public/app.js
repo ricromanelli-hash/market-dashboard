@@ -153,6 +153,44 @@ function flagImg(code, cls = 'idx-flag') {
   return `<img class="${cls}" src="https://flagcdn.com/w40/${code}.png" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`;
 }
 
+// Card de destaques: poucos números em fonte grande, para leitura à distância na TV.
+const ptsFmt = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
+const brlFmt = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+
+const HIGHLIGHTS = [
+  { group: 'Brasil', symbol: 'BRL=X', label: 'Dólar', fmt: (v) => `R$ ${brlFmt.format(v)}` },
+  { group: 'Estados Unidos', symbol: '^GSPC', label: 'S&P 500', fmt: (v) => `${ptsFmt.format(v)} pts` },
+  { group: 'Brasil', symbol: '^BVSP', label: 'Ibovespa', fmt: (v) => `${ptsFmt.format(v)} pts` },
+];
+
+function renderHighlightsCard(data) {
+  const g = data.groups || {};
+  const itens = HIGHLIGHTS.map((h) => {
+    const it = (g[h.group] || []).find((x) => x.symbol === h.symbol);
+    if (!it || typeof it.price !== 'number') {
+      return `<div class="hl-item"><span class="hl-label">${h.label}</span>
+        <div class="hl-value hl-na">—</div></div>`;
+    }
+    const up = (it.changePct ?? 0) >= 0;
+    const seta = up ? '▲' : '▼';
+    const pct = typeof it.changePct === 'number'
+      ? `${seta} ${Math.abs(it.changePct).toFixed(2).replace('.', ',')}%` : '';
+    return `
+      <div class="hl-item">
+        <div class="hl-top">
+          <span class="hl-label">${h.label}</span>
+          <span class="hl-pct ${up ? 'up' : 'down'}">${pct}</span>
+        </div>
+        <div class="hl-value">${h.fmt(it.price)}</div>
+      </div>`;
+  }).join('');
+  return `
+    <section class="card hl-card">
+      <div class="card-header">Destaques</div>
+      <div class="card-body">${itens}</div>
+    </section>`;
+}
+
 // Juros reais por país: taxa básica (BIS) x inflação 12m (OCDE), fórmula de Fisher.
 function renderRealRatesCard(rows) {
   if (!rows || rows.length === 0) {
@@ -350,6 +388,7 @@ function cardBuilders(data) {
   const g = data.groups || {};
   const newsLimit = TV_MODE ? TV_NEWS_LIMIT : undefined;
   const builders = {
+    'Destaques': () => renderHighlightsCard(data),
     'Estados Unidos': () => renderGroupCard('Estados Unidos', g['Estados Unidos'], renderCpiRow(data.cpi)),
     'Brasil': () => renderGroupCard('Brasil', g['Brasil'], renderBrasilRatesRows(data.brasilRates)),
     'IndicesMundiais': () => renderWorldIndicesCard(data.worldIndices),
@@ -369,7 +408,8 @@ function cardBuilders(data) {
 // Layout fixo do modo TV: cada array é uma coluna, na ordem definida pelo usuário.
 // A última coluna é mais larga para acomodar o calendário do Investing.
 const TV_LAYOUT = [
-  ['Estados Unidos', 'Brasil'],
+  // "Destaques" entra no fim da coluna 1, que tinha ~460px livres — nada acima se move
+  ['Estados Unidos', 'Brasil', 'Destaques'],
   ['Commodities', 'IndicesMundiais', 'JurosReais'],
   ['Bancos', 'Energia', 'Seguros', 'Saneamento', 'Telecom', 'Petróleo & Gás'],
   ['Mineração', 'Papel & Celulose', 'Metalurgia & Siderurgia', 'Químicos & Petroquímicos', 'Outros'],
