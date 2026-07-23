@@ -45,7 +45,8 @@ function renderQuoteRow(item) {
       </div>`;
   }
   const { cls, icon } = changeIcon(item.changePct);
-  const pctText = typeof item.changePct === 'number' ? `${item.changePct >= 0 ? '+' : ''}${item.changePct.toFixed(2)}%` : '—';
+  // uma casa decimal: encurta a coluna do dia e sobra largura para o mini-gráfico
+  const pctText = typeof item.changePct === 'number' ? `${item.changePct >= 0 ? '+' : ''}${item.changePct.toFixed(1)}%` : '—';
   // tendência de 12 meses: verde/vermelho conforme o saldo do período
   const trend = item.spark && item.spark.length > 1
     ? `<span class="row-spark" title="tendência de 12 meses">${sparkline(item.spark, item.spark[item.spark.length - 1] >= item.spark[0])}</span>`

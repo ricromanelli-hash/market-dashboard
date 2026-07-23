@@ -370,7 +370,7 @@ body.tv-mode .row-note { font-size: 9.5px; }
   display: grid;
   /* a coluna de 12m precisa comportar valores de 3 dígitos ("+151,4%"), senão o
      texto (alinhado à direita) transborda para a esquerda e encosta no gráfico */
-  grid-template-columns: 18px minmax(0, 1fr) 24px 46px 46px 54px;
+  grid-template-columns: 18px minmax(0, 1fr) 32px 46px 46px 54px;
   align-items: center;
   gap: 4px;
 }
@@ -383,11 +383,11 @@ body.tv-mode .row-note { font-size: 9.5px; }
    um pouco mais estreito que a coluna, sobrando espaço à direita dele.
    (margin-right não serve: o svg tem largura fixa e transborda a coluna.) */
 .row-stock .row-spark { justify-content: flex-start; }
-.row-stock .row-spark svg { width: 19px; }
-body.tv-mode .row-stock .row-spark svg { width: 17px; }
+.row-stock .row-spark svg { width: 27px; }
+body.tv-mode .row-stock .row-spark svg { width: 33px; }
 
 body.tv-mode .row-stock {
-  grid-template-columns: 20px minmax(0, 1fr) 22px 48px 46px 62px;
+  grid-template-columns: 20px minmax(0, 1fr) 38px 48px 46px 56px;
   gap: 4px;
 }
 
