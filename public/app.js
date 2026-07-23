@@ -174,6 +174,66 @@ function flagImg(code, cls = 'idx-flag') {
   return `<img class="${cls}" src="https://flagcdn.com/w40/${code}.png" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`;
 }
 
+// Medidor (velocímetro) do Fear & Greed Index, no estilo do gráfico da CNN.
+const FNG_FAIXAS = [
+  { ate: 25, cor: '#c62828', nome: 'MEDO EXTREMO' },
+  { ate: 45, cor: '#ef6c00', nome: 'MEDO' },
+  { ate: 55, cor: '#9e9e9e', nome: 'NEUTRO' },
+  { ate: 75, cor: '#7cb342', nome: 'GANÂNCIA' },
+  { ate: 100, cor: '#1a7f37', nome: 'GANÂNCIA EXTREMA' },
+];
+
+// converte um valor 0..100 num ponto do semicírculo (180° = 0, 0° = 100)
+function fngPonto(v, raio, cx, cy) {
+  const ang = Math.PI * (1 - v / 100);
+  return [cx + raio * Math.cos(ang), cy - raio * Math.sin(ang)];
+}
+
+function fngArco(de, ate, rInt, rExt, cx, cy) {
+  const [x1, y1] = fngPonto(de, rExt, cx, cy);
+  const [x2, y2] = fngPonto(ate, rExt, cx, cy);
+  const [x3, y3] = fngPonto(ate, rInt, cx, cy);
+  const [x4, y4] = fngPonto(de, rInt, cx, cy);
+  return `M ${x1} ${y1} A ${rExt} ${rExt} 0 0 1 ${x2} ${y2} L ${x3} ${y3} A ${rInt} ${rInt} 0 0 0 ${x4} ${y4} Z`;
+}
+
+function renderFearGreedCard(fg) {
+  if (!fg || typeof fg.score !== 'number') {
+    return `<section class="card"><div class="card-header">Fear &amp; Greed</div>
+      <div class="card-body"><p class="row-unavailable" style="padding:12px">carregando…</p></div></section>`;
+  }
+  const cx = 100, cy = 92, rInt = 46, rExt = 82;
+  const faixa = FNG_FAIXAS.find((f) => fg.score <= f.ate) || FNG_FAIXAS[FNG_FAIXAS.length - 1];
+  let de = 0;
+  const arcos = FNG_FAIXAS.map((f) => {
+    const d = fngArco(de, f.ate, rInt, rExt, cx, cy);
+    const atual = f === faixa;
+    de = f.ate;
+    return `<path d="${d}" fill="${f.cor}" opacity="${atual ? 1 : 0.28}"/>`;
+  }).join('');
+  // ponteiro
+  const [px, py] = fngPonto(fg.score, rExt - 6, cx, cy);
+  const marcas = [0, 25, 50, 75, 100].map((v) => {
+    const [tx, ty] = fngPonto(v, rExt + 11, cx, cy);
+    return `<text x="${tx}" y="${ty}" class="fng-tick">${v}</text>`;
+  }).join('');
+  return `
+    <section class="card fng-card">
+      <div class="card-header">Fear &amp; Greed</div>
+      <div class="card-body fng-body">
+        <svg viewBox="0 0 200 116" class="fng-svg" role="img" aria-label="Fear and Greed ${fg.score}">
+          ${arcos}
+          ${marcas}
+          <line x1="${cx}" y1="${cy}" x2="${px}" y2="${py}" class="fng-agulha"/>
+          <circle cx="${cx}" cy="${cy}" r="7" class="fng-centro"/>
+          <text x="${cx}" y="${cy + 26}" class="fng-valor" fill="${faixa.cor}">${Math.round(fg.score)}</text>
+        </svg>
+        <div class="fng-rotulo" style="color:${faixa.cor}">${faixa.nome}</div>
+        <div class="fng-hist">ontem ${fg.prevClose ?? '—'} · 1 sem ${fg.week ?? '—'} · 1 mês ${fg.month ?? '—'}</div>
+      </div>
+    </section>`;
+}
+
 // Card de destaques: poucos números em fonte grande, para leitura à distância na TV.
 const ptsFmt = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
 const brlFmt = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
@@ -411,6 +471,7 @@ function cardBuilders(data) {
   const newsLimit = TV_MODE ? TV_NEWS_LIMIT : undefined;
   const builders = {
     'Destaques': () => renderHighlightsCard(data),
+    'FearGreed': () => renderFearGreedCard(data.fearGreed),
     'Estados Unidos': () => renderGroupCard('Estados Unidos', g['Estados Unidos'], renderCpiRow(data.cpi)),
     'Brasil': () => renderGroupCard('Brasil', g['Brasil'], renderBrasilRatesRows(data.brasilRates)),
     'IndicesMundiais': () => renderWorldIndicesCard(data.worldIndices),
@@ -431,7 +492,7 @@ function cardBuilders(data) {
 // A última coluna é mais larga para acomodar o calendário do Investing.
 const TV_LAYOUT = [
   // "Destaques" entra no fim da coluna 1, que tinha ~460px livres — nada acima se move
-  ['Estados Unidos', 'Brasil', 'Destaques'],
+  ['Estados Unidos', 'Brasil', 'Destaques', 'FearGreed'],
   ['Commodities', 'IndicesMundiais', 'JurosReais'],
   ['Bancos', 'Energia', 'Seguros', 'Saneamento', 'Telecom', 'Petróleo & Gás'],
   ['Mineração', 'Papel & Celulose', 'Metalurgia & Siderurgia', 'Químicos & Petroquímicos', 'Outros', 'MAG7 (S&P 500)'],

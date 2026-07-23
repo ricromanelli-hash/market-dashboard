@@ -268,6 +268,7 @@ const cache = {
   calendar: [],
   worldIndices: [],
   realRates: [],
+  fearGreed: null,
   errors: [],
 };
 
@@ -597,6 +598,36 @@ async function refreshUnemployment() {
   if (!Number.isFinite(v)) throw new Error('Alpha Vantage: sem dado de desemprego');
   usUnemployment = { value: +v.toFixed(1), date: String(first.date).slice(0, 7) };
   lastUnempFetch = Date.now();
+}
+
+// Fear & Greed Index (CNN). É a API interna do site: exige cabeçalhos de navegador
+// (Referer/Origin), senão devolve erro. Atualiza poucas vezes ao dia.
+const CNN_FNG_URL = 'https://production.dataviz.cnn.io/index/fearandgreed/graphdata';
+
+async function refreshFearGreed() {
+  const res = await fetch(CNN_FNG_URL, {
+    headers: {
+      'User-Agent': UA,
+      Accept: 'application/json, text/plain, */*',
+      'Accept-Language': 'en-US,en;q=0.9',
+      Referer: 'https://edition.cnn.com/',
+      Origin: 'https://edition.cnn.com',
+    },
+    signal: AbortSignal.timeout(25000),
+  });
+  if (!res.ok) throw new Error(`CNN Fear & Greed: HTTP ${res.status}`);
+  const json = await res.json();
+  const fg = json?.fear_and_greed;
+  const score = Number(fg?.score);
+  if (!Number.isFinite(score)) throw new Error('CNN Fear & Greed: sem score');
+  const num = (v) => (Number.isFinite(Number(v)) ? +Number(v).toFixed(1) : null);
+  cache.fearGreed = {
+    score: +score.toFixed(1),
+    rating: String(fg.rating || ''),
+    prevClose: num(fg.previous_close),
+    week: num(fg.previous_1_week),
+    month: num(fg.previous_1_month),
+  };
 }
 
 // PIB anual (crescimento %) dos 8 países, via World Bank Data360
@@ -945,6 +976,7 @@ async function refreshSlowData() {
       if (erros.length) throw new Error(erros.join(' | '));
     })(),
     refreshDiFutures(),
+    refreshFearGreed(),
     refreshHistory(),
     refreshNews(),
     refreshMacroNews(),

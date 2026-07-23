@@ -364,6 +364,21 @@ body.tv-mode .hl-value { font-size: 38px; }
 }
 body.tv-mode .row-note { font-size: 9.5px; }
 
+/* ---- Medidor do Fear & Greed ---- */
+.fng-body { padding: 4px 8px 6px; text-align: center; }
+/* o svg não precisa da largura toda do card: limita a altura do medidor */
+.fng-svg { width: 88%; max-width: 250px; height: auto; display: block; margin: 0 auto; }
+.fng-agulha { stroke: #333; stroke-width: 3.5; stroke-linecap: round; }
+.fng-centro { fill: #333; }
+.fng-valor { font-size: 26px; font-weight: 800; text-anchor: middle; }
+.fng-tick { font-size: 9px; fill: var(--text-muted); text-anchor: middle; dominant-baseline: middle; }
+.fng-rotulo { font-size: 11.5px; font-weight: 800; letter-spacing: 0.4px; margin-top: 2px; }
+.fng-hist { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+body.tv-mode .fng-valor { font-size: 30px; }
+body.tv-mode .fng-rotulo { font-size: 13px; }
+body.tv-mode .fng-hist { font-size: 10.5px; }
+
 /* Linhas de ações em grid: com flex cada linha se dimensionava pelo próprio conteúdo
    e as colunas ficavam desalinhadas entre si. Larguras fixas resolvem. */
 .row-stock {
