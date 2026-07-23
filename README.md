@@ -69,6 +69,30 @@ Passo a passo:
 | Notícias (geral, macro e por empresa) | RSS do InfoMoney e do Money Times | Feed geral + editorias de economia/inflação/Copom; filtro por empresa via ticker/nome |
 | Calendário Econômico | Widget oficial do Investing.com (iframe, roda no navegador) + Agenda IBGE (API pública) | O IBGE dá as datas de divulgação (IPCA, PIB, PNAD, PMC, PMS, etc.) |
 
+### Termômetro do Mercado
+
+Dois medidores lado a lado:
+
+- **EUA** — o *Fear & Greed Index* oficial da CNN (API interna do site; exige
+  cabeçalhos `Referer`/`Origin` de navegador).
+- **Brasil** — **índice próprio**, calculado neste projeto. Não é o "Índice de Pânico e
+  Otimismo" da R² Quant nem o S&P/B3 Ibovespa VIX (nenhum dos dois tem API pública);
+  os valores **não são comparáveis** com os deles.
+
+Metodologia do índice brasileiro (`calcSentimentoBr` em [server.js](server.js)) —
+quatro componentes normalizados em 0–100 (0 = pânico, 100 = otimismo), média simples:
+
+| Componente | O que mede |
+|---|---|
+| Momento | posição do Ibovespa dentro da sua faixa de 12 meses |
+| Força | posição média das ações da B3 nas faixas de 12 meses delas |
+| Amplitude | % de ações acima da própria média de 12 meses |
+| Calmaria | volatilidade recente (~2 meses) vs. a do ano — menos volatilidade eleva o índice |
+
+Tudo derivado das séries do Yahoo que o painel já busca para os mini-gráficos — sem
+requisição extra. Se menos de 3 componentes puderem ser calculados, o índice não é
+publicado (o card mostra "carregando…").
+
 ### O que **não** foi implementado (sem fonte gratuita confiável)
 
 - **CPI (EUA)**: o BLS (Bureau of Labor Statistics) tem API pública, mas exige

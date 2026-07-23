@@ -197,13 +197,14 @@ function fngArco(de, ate, rInt, rExt, cx, cy) {
   return `M ${x1} ${y1} A ${rExt} ${rExt} 0 0 1 ${x2} ${y2} L ${x3} ${y3} A ${rInt} ${rInt} 0 0 0 ${x4} ${y4} Z`;
 }
 
-function renderFearGreedCard(fg) {
-  if (!fg || typeof fg.score !== 'number') {
-    return `<section class="card"><div class="card-header">Fear &amp; Greed</div>
-      <div class="card-body"><p class="row-unavailable" style="padding:12px">carregando…</p></div></section>`;
+// Um medidor. `titulo` identifica o mercado; `nota` vai no rodapé.
+function renderGauge(score, titulo, nota) {
+  if (typeof score !== 'number') {
+    return `<div class="fng-item"><div class="fng-titulo">${titulo}</div>
+      <p class="row-unavailable" style="padding:10px 0">carregando…</p></div>`;
   }
   const cx = 100, cy = 92, rInt = 46, rExt = 82;
-  const faixa = FNG_FAIXAS.find((f) => fg.score <= f.ate) || FNG_FAIXAS[FNG_FAIXAS.length - 1];
+  const faixa = FNG_FAIXAS.find((f) => score <= f.ate) || FNG_FAIXAS[FNG_FAIXAS.length - 1];
   let de = 0;
   const arcos = FNG_FAIXAS.map((f) => {
     const d = fngArco(de, f.ate, rInt, rExt, cx, cy);
@@ -211,25 +212,38 @@ function renderFearGreedCard(fg) {
     de = f.ate;
     return `<path d="${d}" fill="${f.cor}" opacity="${atual ? 1 : 0.28}"/>`;
   }).join('');
-  // ponteiro
-  const [px, py] = fngPonto(fg.score, rExt - 6, cx, cy);
-  const marcas = [0, 25, 50, 75, 100].map((v) => {
+  const [px, py] = fngPonto(score, rExt - 6, cx, cy);
+  const marcas = [0, 50, 100].map((v) => {
     const [tx, ty] = fngPonto(v, rExt + 11, cx, cy);
     return `<text x="${tx}" y="${ty}" class="fng-tick">${v}</text>`;
   }).join('');
   return `
+    <div class="fng-item">
+      <div class="fng-titulo">${titulo}</div>
+      <svg viewBox="0 0 200 116" class="fng-svg" role="img" aria-label="${titulo} ${score}">
+        ${arcos}
+        ${marcas}
+        <line x1="${cx}" y1="${cy}" x2="${px}" y2="${py}" class="fng-agulha"/>
+        <circle cx="${cx}" cy="${cy}" r="7" class="fng-centro"/>
+        <text x="${cx}" y="${cy + 26}" class="fng-valor" fill="${faixa.cor}">${Math.round(score)}</text>
+      </svg>
+      <div class="fng-rotulo" style="color:${faixa.cor}">${faixa.nome}</div>
+      <div class="fng-hist">${nota}</div>
+    </div>`;
+}
+
+// Card com os dois termômetros lado a lado (EUA e Brasil).
+function renderSentimentoCard(fg, br) {
+  const notaEua = fg ? `ontem ${fg.prevClose ?? '—'} · 1 mês ${fg.month ?? '—'}` : '';
+  const notaBr = br
+    ? `momento ${br.componentes.momento} · amplitude ${br.componentes.amplitude}`
+    : '';
+  return `
     <section class="card fng-card">
-      <div class="card-header">Fear &amp; Greed</div>
+      <div class="card-header">Termômetro do Mercado</div>
       <div class="card-body fng-body">
-        <svg viewBox="0 0 200 116" class="fng-svg" role="img" aria-label="Fear and Greed ${fg.score}">
-          ${arcos}
-          ${marcas}
-          <line x1="${cx}" y1="${cy}" x2="${px}" y2="${py}" class="fng-agulha"/>
-          <circle cx="${cx}" cy="${cy}" r="7" class="fng-centro"/>
-          <text x="${cx}" y="${cy + 26}" class="fng-valor" fill="${faixa.cor}">${Math.round(fg.score)}</text>
-        </svg>
-        <div class="fng-rotulo" style="color:${faixa.cor}">${faixa.nome}</div>
-        <div class="fng-hist">ontem ${fg.prevClose ?? '—'} · 1 sem ${fg.week ?? '—'} · 1 mês ${fg.month ?? '—'}</div>
+        ${renderGauge(fg?.score, 'EUA · Fear &amp; Greed', notaEua)}
+        ${renderGauge(br?.score, 'Brasil · B3', notaBr)}
       </div>
     </section>`;
 }
@@ -471,7 +485,7 @@ function cardBuilders(data) {
   const newsLimit = TV_MODE ? TV_NEWS_LIMIT : undefined;
   const builders = {
     'Destaques': () => renderHighlightsCard(data),
-    'FearGreed': () => renderFearGreedCard(data.fearGreed),
+    'FearGreed': () => renderSentimentoCard(data.fearGreed, data.sentimentoBr),
     'Estados Unidos': () => renderGroupCard('Estados Unidos', g['Estados Unidos'], renderCpiRow(data.cpi)),
     'Brasil': () => renderGroupCard('Brasil', g['Brasil'], renderBrasilRatesRows(data.brasilRates)),
     'IndicesMundiais': () => renderWorldIndicesCard(data.worldIndices),

@@ -269,6 +269,7 @@ const cache = {
   worldIndices: [],
   realRates: [],
   fearGreed: null,
+  sentimentoBr: null,
   errors: [],
 };
 
@@ -389,7 +390,78 @@ async function fetchYearSpark(symbol) {
     .filter((c) => typeof c === 'number');
   if (closes.length < 2) throw new Error(`Yahoo hist ${symbol}: série curta`);
   // base = primeiro fechamento da janela de 1 ano, usado para a variação de 12 meses
-  return { spark: downsample(closes, 40).map((n) => +n.toFixed(2)), base: closes[0] };
+  return {
+    spark: downsample(closes, 40).map((n) => +n.toFixed(2)),
+    base: closes[0],
+    closes, // série completa: alimenta o termômetro de sentimento
+  };
+}
+
+// Posição do último valor dentro da faixa de 12 meses, em 0..100.
+// 0 = na mínima do ano, 100 = na máxima.
+function posicaoNaFaixa(closes) {
+  const min = Math.min(...closes);
+  const max = Math.max(...closes);
+  if (!(max > min)) return null;
+  return ((closes[closes.length - 1] - min) / (max - min)) * 100;
+}
+
+const media = (a) => a.reduce((s, x) => s + x, 0) / a.length;
+
+// Desvio-padrão dos retornos (volatilidade realizada) de uma série de fechamentos.
+function volatilidade(closes) {
+  const r = [];
+  for (let i = 1; i < closes.length; i++) {
+    if (closes[i - 1] > 0) r.push((closes[i] - closes[i - 1]) / closes[i - 1]);
+  }
+  if (r.length < 2) return null;
+  const m = media(r);
+  return Math.sqrt(media(r.map((x) => (x - m) ** 2)));
+}
+
+const clamp100 = (v) => Math.max(0, Math.min(100, v));
+
+// ---- Termômetro de sentimento da B3 (metodologia própria) ----
+// Quatro componentes, cada um normalizado em 0..100 (0 = pânico, 100 = otimismo):
+//   Momento     posição do Ibovespa na sua faixa de 12 meses
+//   Força       posição média das ações na faixa de 12 meses delas
+//   Amplitude   % de ações acima da própria média de 12 meses
+//   Calmaria    volatilidade recente vs. a do ano (menos volatilidade = mais confiança)
+// Tudo derivado das séries do Yahoo que já buscamos — sem fonte nova.
+function calcSentimentoBr(historicoAcoes, ibovCloses) {
+  const comp = {};
+
+  if (ibovCloses && ibovCloses.length > 10) {
+    comp.momento = posicaoNaFaixa(ibovCloses);
+    const recente = ibovCloses.slice(-9);           // ~2 meses (semanal)
+    const volRec = volatilidade(recente);
+    const volAno = volatilidade(ibovCloses);
+    if (volRec !== null && volAno > 0) {
+      // razão 0,5 (bem calmo) -> 100 ; 1,5 (bem agitado) -> 0
+      comp.calmaria = clamp100(((1.5 - volRec / volAno) / 1.0) * 100);
+    }
+  }
+
+  const posicoes = [];
+  let acimaDaMedia = 0;
+  let total = 0;
+  for (const closes of historicoAcoes) {
+    if (!closes || closes.length < 10) continue;
+    const p = posicaoNaFaixa(closes);
+    if (p !== null) posicoes.push(p);
+    total += 1;
+    if (closes[closes.length - 1] > media(closes)) acimaDaMedia += 1;
+  }
+  if (posicoes.length) comp.forca = media(posicoes);
+  if (total) comp.amplitude = (acimaDaMedia / total) * 100;
+
+  const valores = Object.values(comp).filter((v) => Number.isFinite(v));
+  if (valores.length < 3) return null; // sem componentes suficientes, não publica
+  return {
+    score: +media(valores).toFixed(1),
+    componentes: Object.fromEntries(Object.entries(comp).map(([k, v]) => [k, +v.toFixed(0)])),
+    base: total,
+  };
 }
 
 async function refreshHistory() {
@@ -401,16 +473,25 @@ async function refreshHistory() {
     }
   }
   let falhas = 0;
+  const seriesB3 = [];
   await mapWithConcurrency(symbols, 5, async (symbol) => {
     try {
-      const { spark, base } = await fetchYearSpark(symbol);
+      const { spark, base, closes } = await fetchYearSpark(symbol);
       historySpark.set(symbol, spark);
       historyBase.set(symbol, base);
+      if (symbol.endsWith('.SA')) seriesB3.push(closes); // termômetro usa só a B3
     } catch {
       falhas += 1; // mantém o histórico anterior, se houver
     }
   });
   if (falhas === symbols.length) throw new Error('Histórico 12m: todas as ações falharam');
+
+  // termômetro da B3: precisa também da série do Ibovespa
+  let ibov = null;
+  try {
+    ibov = (await fetchYearSpark('^BVSP')).closes;
+  } catch { /* sem o Ibovespa o índice usa só os componentes de ações */ }
+  cache.sentimentoBr = calcSentimentoBr(seriesB3, ibov);
 }
 
 async function mapWithConcurrency(items, limit, fn) {
