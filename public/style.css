@@ -363,6 +363,25 @@ body.tv-mode .hl-value { font-size: 38px; }
 }
 body.tv-mode .row-note { font-size: 9.5px; }
 
+/* Linhas de ações em grid: com flex cada linha se dimensionava pelo próprio conteúdo
+   e as colunas ficavam desalinhadas entre si. Larguras fixas resolvem. */
+.row-stock {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 24px 40px 48px 54px;
+  align-items: center;
+  gap: 4px;
+}
+/* nowrap: sem isso um valor longo como "↗ +10,05%" quebra em 2 linhas e a linha
+   fica mais alta que as vizinhas, estragando o efeito de tabela */
+.row-stock .row-price,
+.row-stock .row-change { text-align: right; white-space: nowrap; }
+.row-stock .row-change { justify-content: flex-end; }
+
+body.tv-mode .row-stock {
+  grid-template-columns: 20px minmax(0, 1fr) 22px 42px 50px 62px;
+  gap: 4px;
+}
+
 /* variação de 12 meses, ao lado do mini-gráfico do mesmo período */
 .row-12m {
   flex: 0 0 42px;
@@ -585,7 +604,6 @@ body.tv-mode .card-header { font-size: 14.5px; padding: 4px 9px; }
 body.tv-mode .row { padding: 1px 8px; font-size: 14px; }
 /* nome um pouco menor que a cotação: cabe em 1 linha mesmo com a coluna de 12m */
 body.tv-mode .row-name { font-weight: 600; font-size: 12.5px; }
-body.tv-mode .row-logo { width: 22px; height: 22px; flex-basis: 22px; }
 /* Numa TV o ticker (e a data de referência) não compensam a linha extra: com o logo
    e o nome a identificação já é clara, e cada linha cai de ~44px para ~26px. */
 body.tv-mode .row-symbol { display: none; }

@@ -50,20 +50,36 @@ function renderQuoteRow(item) {
   const trend = item.spark && item.spark.length > 1
     ? `<span class="row-spark" title="tendência de 12 meses">${sparkline(item.spark, item.spark[item.spark.length - 1] >= item.spark[0])}</span>`
     : '';
-  return `
-    <div class="row">
-      ${logo}
-      <div class="row-label">
+  const nome = `<div class="row-label">
         <span class="row-name">${item.label}${item.refDate ? `<span class="row-note" title="não é preço intradiário: último fechamento disponível">fech. ${item.refDate}</span>` : ''}</span>
         <span class="row-symbol">${item.displaySymbol || item.symbol}</span>
-      </div>
-      ${trend}
-      ${typeof item.chg12m === 'number'
-        ? `<span class="row-12m ${item.chg12m >= 0 ? 'up' : 'down'}" title="variação em 12 meses">${item.chg12m >= 0 ? '+' : ''}${item.chg12m.toFixed(1)}%</span>`
-        : ''}
+      </div>`;
+  const preco = `<span class="row-price">${formatPrice(item.price, item.currency)}</span>`;
+  const variacao = `<span class="row-change ${cls}">${icon} ${pctText}</span>`;
+
+  // Ações da B3 usam grid de colunas fixas (logo · nome · gráfico · 12m · preço · dia),
+  // para os valores ficarem alinhados entre as linhas como numa tabela.
+  if (logo) {
+    const v12 = typeof item.chg12m === 'number'
+      ? `<span class="row-12m ${item.chg12m >= 0 ? 'up' : 'down'}" title="variação em 12 meses">${item.chg12m >= 0 ? '+' : ''}${item.chg12m.toFixed(1)}%</span>`
+      : '<span class="row-12m"></span>';
+    return `
+      <div class="row row-stock">
+        ${logo}
+        ${nome}
+        ${trend || '<span class="row-spark"></span>'}
+        ${v12}
+        ${preco}
+        ${variacao}
+      </div>`;
+  }
+
+  return `
+    <div class="row">
+      ${nome}
       <div class="row-values">
-        <span class="row-price">${formatPrice(item.price, item.currency)}</span>
-        <span class="row-change ${cls}">${icon} ${pctText}</span>
+        ${preco}
+        ${variacao}
       </div>
     </div>`;
 }
