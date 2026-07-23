@@ -88,8 +88,8 @@ const GROUPS = [
   { title: 'Metalurgia & Siderurgia', items: [
     { symbol: 'USIM5.SA', label: 'Usiminas' },
     { symbol: 'CSNA3.SA', label: 'CSN' },
-    { symbol: 'GGBR4.SA', label: 'Gerdau (Metalúrgica)' },
-    { symbol: 'GOAU4.SA', label: 'Gerdau (Holding)' },
+    { symbol: 'GGBR4.SA', label: 'Gerdau Metal.' },
+    { symbol: 'GOAU4.SA', label: 'Gerdau Hold.' },
   ]},
   { title: 'Químicos & Petroquímicos', items: [
     { symbol: 'UNIP6.SA', label: 'Unipar' },
@@ -364,6 +364,7 @@ async function fetchIndexQuote(symbol) {
 // ação. Fica no ciclo lento: um gráfico anual não muda no intraday, e assim evitamos
 // ~53 requisições extras a cada 30s.
 const historySpark = new Map(); // symbol -> número[]
+const historyBase = new Map();  // symbol -> fechamento de ~12 meses atrás
 
 async function fetchYearSpark(symbol) {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1wk&range=1y`;
@@ -373,7 +374,8 @@ async function fetchYearSpark(symbol) {
   const closes = (json?.chart?.result?.[0]?.indicators?.quote?.[0]?.close || [])
     .filter((c) => typeof c === 'number');
   if (closes.length < 2) throw new Error(`Yahoo hist ${symbol}: série curta`);
-  return downsample(closes, 40).map((n) => +n.toFixed(2));
+  // base = primeiro fechamento da janela de 1 ano, usado para a variação de 12 meses
+  return { spark: downsample(closes, 40).map((n) => +n.toFixed(2)), base: closes[0] };
 }
 
 async function refreshHistory() {
@@ -386,7 +388,9 @@ async function refreshHistory() {
   let falhas = 0;
   await mapWithConcurrency(symbols, 5, async (symbol) => {
     try {
-      historySpark.set(symbol, await fetchYearSpark(symbol));
+      const { spark, base } = await fetchYearSpark(symbol);
+      historySpark.set(symbol, spark);
+      historyBase.set(symbol, base);
     } catch {
       falhas += 1; // mantém o histórico anterior, se houver
     }
@@ -415,7 +419,12 @@ async function refreshMarketData() {
   for (const group of GROUPS) {
     const results = await mapWithConcurrency(group.items, 6, async (item) => {
       const quote = await fetchQuote(item.symbol, item.fromSeries);
-      return { ...item, ...quote, spark: historySpark.get(item.symbol) || null };
+      // variação de 12 meses: preço atual contra o fechamento de ~1 ano atrás
+      const base = historyBase.get(item.symbol);
+      const chg12m = (base && typeof quote.price === 'number')
+        ? +(((quote.price - base) / base) * 100).toFixed(1)
+        : null;
+      return { ...item, ...quote, spark: historySpark.get(item.symbol) || null, chg12m };
     });
     cache.groups[group.title] = results;
   }

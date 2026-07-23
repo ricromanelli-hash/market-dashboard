@@ -363,18 +363,37 @@ body.tv-mode .hl-value { font-size: 38px; }
 }
 body.tv-mode .row-note { font-size: 9.5px; }
 
+/* variação de 12 meses, ao lado do mini-gráfico do mesmo período */
+.row-12m {
+  flex: 0 0 42px;
+  text-align: right;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.row-12m.up { color: var(--green-up); }
+.row-12m.down { color: var(--red-down); }
+body.tv-mode .row-12m { flex-basis: 40px; font-size: 11px; }
+/* na TV o espaço é disputado com o nome: encolhe logo e sparkline para não quebrar linha */
+body.tv-mode .row-logo { width: 18px; height: 18px; flex-basis: 18px; }
+body.tv-mode .row-spark { flex-basis: 22px; }
+body.tv-mode .row-spark svg { width: 22px; }
+
 /* mini-gráfico de tendência de 12 meses, entre o nome e a cotação */
 .row-spark {
-  flex: 0 0 32px;
+  flex: 0 0 24px;
   display: inline-flex;
   align-items: center;
   opacity: 0.85;
 }
 .row-spark svg {
   flex: none;
-  width: 32px;
+  width: 24px;
   height: 14px;
 }
+/* com a coluna de 12m disputando espaço, o nome usa fonte um pouco menor */
+.row-name { font-size: 12.5px; }
 
 /* logo da empresa (brapi) à esquerda do nome */
 .row-logo {
@@ -563,8 +582,9 @@ body.tv-mode .card {
 
 /* tamanhos calibrados para leitura de longe, preenchendo a tela de 1080p */
 body.tv-mode .card-header { font-size: 14.5px; padding: 4px 9px; }
-body.tv-mode .row { padding: 2px 9px; font-size: 14px; }
-body.tv-mode .row-name { font-weight: 600; }
+body.tv-mode .row { padding: 1px 8px; font-size: 14px; }
+/* nome um pouco menor que a cotação: cabe em 1 linha mesmo com a coluna de 12m */
+body.tv-mode .row-name { font-weight: 600; font-size: 12.5px; }
 body.tv-mode .row-logo { width: 22px; height: 22px; flex-basis: 22px; }
 /* Numa TV o ticker (e a data de referência) não compensam a linha extra: com o logo
    e o nome a identificação já é clara, e cada linha cai de ~44px para ~26px. */

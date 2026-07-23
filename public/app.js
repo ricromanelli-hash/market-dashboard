@@ -58,6 +58,9 @@ function renderQuoteRow(item) {
         <span class="row-symbol">${item.displaySymbol || item.symbol}</span>
       </div>
       ${trend}
+      ${typeof item.chg12m === 'number'
+        ? `<span class="row-12m ${item.chg12m >= 0 ? 'up' : 'down'}" title="variação em 12 meses">${item.chg12m >= 0 ? '+' : ''}${item.chg12m.toFixed(1)}%</span>`
+        : ''}
       <div class="row-values">
         <span class="row-price">${formatPrice(item.price, item.currency)}</span>
         <span class="row-change ${cls}">${icon} ${pctText}</span>
