@@ -108,7 +108,7 @@ const GROUPS = [
     { symbol: 'TOTS3.SA', label: 'Totvs' },
     { symbol: 'VBBR3.SA', label: 'Vibra' },
     { symbol: 'UGPA3.SA', label: 'Ultrapar' },
-    { symbol: 'SAUD3.SA', label: 'Bradesco Saúde' },
+    { symbol: 'SAUD3.SA', label: 'BRSAUDE' },
   ]},
   // "Magnificent 7" do S&P 500. `icon` habilita o logo (o serviço da brapi só tem
   // algumas destas; as demais ficam com o espaço reservado em branco).
@@ -120,6 +120,8 @@ const GROUPS = [
     { symbol: 'MSFT', label: 'Microsoft', icon: 'MSFT' },
     { symbol: 'NVDA', label: 'Nvidia', icon: 'NVDA' },
     { symbol: 'TSLA', label: 'Tesla', icon: 'TSLA' },
+    { symbol: 'SAP', label: 'SAP', icon: 'SAP' },
+    { symbol: 'ORCL', label: 'Oracle', icon: 'ORCL' },
   ]},
 ];
 
