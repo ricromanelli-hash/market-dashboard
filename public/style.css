@@ -62,7 +62,8 @@ body.tv-mode .pair-group > .card { margin-bottom: 10px; }
   text-overflow: ellipsis;
 }
 
-.spark, .spark-empty {
+.idx-row .spark,
+.idx-row .spark-empty {
   flex: 0 0 44px;
   width: 44px;
   height: 15px;
@@ -367,7 +368,9 @@ body.tv-mode .row-note { font-size: 9.5px; }
    e as colunas ficavam desalinhadas entre si. Larguras fixas resolvem. */
 .row-stock {
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) 24px 40px 48px 54px;
+  /* a coluna de 12m precisa comportar valores de 3 dígitos ("+151,4%"), senão o
+     texto (alinhado à direita) transborda para a esquerda e encosta no gráfico */
+  grid-template-columns: 18px minmax(0, 1fr) 24px 46px 46px 54px;
   align-items: center;
   gap: 4px;
 }
@@ -376,9 +379,15 @@ body.tv-mode .row-note { font-size: 9.5px; }
 .row-stock .row-price,
 .row-stock .row-change { text-align: right; white-space: nowrap; }
 .row-stock .row-change { justify-content: flex-end; }
+/* Respiro entre o mini-gráfico e a variação de 12 meses: o gráfico é desenhado
+   um pouco mais estreito que a coluna, sobrando espaço à direita dele.
+   (margin-right não serve: o svg tem largura fixa e transborda a coluna.) */
+.row-stock .row-spark { justify-content: flex-start; }
+.row-stock .row-spark svg { width: 19px; }
+body.tv-mode .row-stock .row-spark svg { width: 17px; }
 
 body.tv-mode .row-stock {
-  grid-template-columns: 20px minmax(0, 1fr) 22px 42px 50px 62px;
+  grid-template-columns: 20px minmax(0, 1fr) 22px 48px 46px 62px;
   gap: 4px;
 }
 
@@ -585,7 +594,10 @@ body.tv-mode .idx-name { font-size: 11px; }
 body.tv-mode .idx-values { flex-direction: row; align-items: baseline; gap: 5px; }
 body.tv-mode .idx-price { font-size: 11px; }
 body.tv-mode .idx-pct { font-size: 9.5px; }
-body.tv-mode .spark, body.tv-mode .spark-empty { flex-basis: 32px; width: 32px; height: 12px; }
+/* restrito à tabela de índices: a classe .spark também é usada nas linhas de ações,
+   onde a largura é definida pela coluna do grid */
+body.tv-mode .idx-row .spark,
+body.tv-mode .idx-row .spark-empty { flex-basis: 32px; width: 32px; height: 12px; }
 /* o calendário do Investing é sobreposto ao slot reservado logo abaixo da Agenda IBGE
    (posicionado por positionCalWidget); fica fora do #grid para não recarregar no refresh */
 body.tv-mode .cal-band { padding: 0; margin: 0; }
