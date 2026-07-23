@@ -25,14 +25,15 @@ function changeIcon(pct) {
 // Logo da empresa via brapi (só ações da B3: PETR4.SA -> icons.brapi.dev/icons/PETR4.svg).
 // Alguns tickers não têm ícone (ex.: AXIA3, PASS3); nesse caso escondemos a imagem
 // mantendo o espaço, para os nomes continuarem alinhados na coluna.
-function logoImg(symbol) {
-  if (!symbol || !symbol.endsWith('.SA')) return '';
-  const ticker = symbol.slice(0, -3);
+function logoImg(symbol, icon) {
+  // B3: deriva do ticker (PETR4.SA -> PETR4). Outras ações: usa `icon` do backend.
+  const ticker = icon || (symbol && symbol.endsWith('.SA') ? symbol.slice(0, -3) : null);
+  if (!ticker) return '';
   return `<img class="row-logo" src="https://icons.brapi.dev/icons/${ticker}.svg" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`;
 }
 
 function renderQuoteRow(item) {
-  const logo = logoImg(item.symbol);
+  const logo = logoImg(item.symbol, item.icon);
   if (item.error) {
     return `
       <div class="row">
@@ -433,7 +434,7 @@ const TV_LAYOUT = [
   ['Estados Unidos', 'Brasil', 'Destaques'],
   ['Commodities', 'IndicesMundiais', 'JurosReais'],
   ['Bancos', 'Energia', 'Seguros', 'Saneamento', 'Telecom', 'Petróleo & Gás'],
-  ['Mineração', 'Papel & Celulose', 'Metalurgia & Siderurgia', 'Químicos & Petroquímicos', 'Outros'],
+  ['Mineração', 'Papel & Celulose', 'Metalurgia & Siderurgia', 'Químicos & Petroquímicos', 'Outros', 'MAG7 (S&P 500)'],
   ['AgendaIBGE', 'CalendarioEconomico', 'NoticiasMacro', 'NoticiasEmpresas'],
 ];
 

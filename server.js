@@ -110,6 +110,17 @@ const GROUPS = [
     { symbol: 'UGPA3.SA', label: 'Ultrapar' },
     { symbol: 'SAUD3.SA', label: 'Bradesco Saúde' },
   ]},
+  // "Magnificent 7" do S&P 500. `icon` habilita o logo (o serviço da brapi só tem
+  // algumas destas; as demais ficam com o espaço reservado em branco).
+  { title: 'MAG7 (S&P 500)', items: [
+    { symbol: 'GOOGL', label: 'Alphabet', icon: 'GOOGL' },
+    { symbol: 'AMZN', label: 'Amazon', icon: 'AMZN' },
+    { symbol: 'AAPL', label: 'Apple', icon: 'AAPL' },
+    { symbol: 'META', label: 'Meta', icon: 'META' },
+    { symbol: 'MSFT', label: 'Microsoft', icon: 'MSFT' },
+    { symbol: 'NVDA', label: 'Nvidia', icon: 'NVDA' },
+    { symbol: 'TSLA', label: 'Tesla', icon: 'TSLA' },
+  ]},
 ];
 
 // Índices mundiais por região, com mini-gráfico de 2 dias (formato "world indices").
@@ -382,7 +393,8 @@ async function refreshHistory() {
   const symbols = [];
   for (const group of GROUPS) {
     for (const item of group.items) {
-      if (item.symbol.endsWith('.SA')) symbols.push(item.symbol); // só ações da B3
+      // ações (B3 e as americanas da MAG7) — índices e commodities ficam de fora
+      if (item.symbol.endsWith('.SA') || item.icon) symbols.push(item.symbol);
     }
   }
   let falhas = 0;
