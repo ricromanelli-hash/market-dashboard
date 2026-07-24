@@ -151,6 +151,7 @@ function renderWorldIndicesCard(regions) {
         <div class="row idx-row">
           ${flag}
           <span class="idx-name">${it.label}</span>
+          ${relogioIndice(it)}
           ${sparkline(it.spark, up)}
           <span class="idx-values">
             <span class="idx-price">${idxFmt.format(it.price)}</span>
@@ -251,15 +252,6 @@ function renderSentimentoCard(fg, br) {
 // ---- Relógio das principais bolsas ----
 // Horários de pregão regular, em hora local de cada praça. Os fusos (e o horário de
 // verão) são resolvidos pelo próprio navegador via Intl — sem API externa.
-const BOLSAS = [
-  { cidade: 'São Paulo', tz: 'America/Sao_Paulo', abre: '10:00', fecha: '17:00' },
-  { cidade: 'Nova York', tz: 'America/New_York', abre: '09:30', fecha: '16:00' },
-  { cidade: 'Londres', tz: 'Europe/London', abre: '08:00', fecha: '16:30' },
-  { cidade: 'Tóquio', tz: 'Asia/Tokyo', abre: '09:00', fecha: '15:00' },
-  { cidade: 'Hong Kong', tz: 'Asia/Hong_Kong', abre: '09:30', fecha: '16:00' },
-  { cidade: 'Sydney', tz: 'Australia/Sydney', abre: '10:00', fecha: '16:00' },
-];
-
 const minutos = (hhmm) => {
   const [h, m] = hhmm.split(':').map(Number);
   return h * 60 + m;
@@ -277,42 +269,38 @@ function agoraEm(tz) {
            min: h * 60 + m, semana: get('weekday') };
 }
 
+// Minutos antes do fechamento em que a cor muda para "fechando".
+const AVISO_FECHAMENTO = 30;
+
 // Não considera feriados locais nem intervalo de almoço (Tóquio/HK) — é uma
 // indicação de horário de pregão, não um status oficial da bolsa.
+// Estados: 'aberta' | 'fechando' (perto do fim) | 'fechada'
 function estadoBolsa(b) {
   const { hhmm, min, semana } = agoraEm(b.tz);
   const util = !['Sat', 'Sun'].includes(semana);
-  const aberta = util && min >= minutos(b.abre) && min < minutos(b.fecha);
-  return { hhmm, aberta };
+  const fecha = minutos(b.fecha);
+  const aberta = util && min >= minutos(b.abre) && min < fecha;
+  let estado = 'fechada';
+  if (aberta) estado = (fecha - min) <= AVISO_FECHAMENTO ? 'fechando' : 'aberta';
+  return { hhmm, aberta, estado };
 }
 
-function renderBolsasCard() {
-  const linhas = BOLSAS.map((b) => {
-    const { hhmm, aberta } = estadoBolsa(b);
-    return `
-      <div class="row clk-row" data-tz="${b.tz}" data-abre="${b.abre}" data-fecha="${b.fecha}">
-        <span class="clk-dot ${aberta ? 'on' : 'off'}"></span>
-        <span class="clk-cidade">${b.cidade}</span>
-        <span class="clk-hora ${aberta ? 'on' : ''}">${hhmm}</span>
-        <span class="clk-sessao">${b.abre}–${b.fecha}</span>
-      </div>`;
-  }).join('');
-  return `
-    <section class="card">
-      <div class="card-header">Bolsas Globais</div>
-      <div class="card-body">${linhas}</div>
-    </section>`;
+// Relógio + estado do pregão, exibido na própria linha do índice.
+function relogioIndice(it) {
+  if (!it.tz) return '';
+  const { hhmm, estado } = estadoBolsa(it);
+  return `<span class="idx-hora ${estado}" data-tz="${it.tz}" data-abre="${it.abre}" data-fecha="${it.fecha}" title="pregão ${it.abre}–${it.fecha} (hora local)">${hhmm}</span>`;
 }
 
 // Atualiza só os relógios, sem refazer o painel inteiro.
 function atualizarRelogios() {
-  document.querySelectorAll('.clk-row').forEach((row) => {
-    const b = { tz: row.dataset.tz, abre: row.dataset.abre, fecha: row.dataset.fecha };
-    const { hhmm, aberta } = estadoBolsa(b);
-    const hora = row.querySelector('.clk-hora');
-    const dot = row.querySelector('.clk-dot');
-    if (hora) { hora.textContent = hhmm; hora.classList.toggle('on', aberta); }
-    if (dot) { dot.classList.toggle('on', aberta); dot.classList.toggle('off', !aberta); }
+  document.querySelectorAll('.idx-hora[data-tz]').forEach((el) => {
+    const { hhmm, estado } = estadoBolsa({
+      tz: el.dataset.tz, abre: el.dataset.abre, fecha: el.dataset.fecha,
+    });
+    el.textContent = hhmm;
+    el.classList.remove('aberta', 'fechando', 'fechada');
+    el.classList.add(estado);
   });
 }
 
@@ -554,7 +542,6 @@ function cardBuilders(data) {
   const builders = {
     'Destaques': () => renderHighlightsCard(data),
     'FearGreed': () => renderSentimentoCard(data.fearGreed, data.sentimentoBr),
-    'Bolsas': () => renderBolsasCard(),
     'Estados Unidos': () => renderGroupCard('Estados Unidos', g['Estados Unidos'], renderCpiRow(data.cpi)),
     'Brasil': () => renderGroupCard('Brasil', g['Brasil'], renderBrasilRatesRows(data.brasilRates)),
     'IndicesMundiais': () => renderWorldIndicesCard(data.worldIndices),
@@ -577,8 +564,7 @@ const TV_LAYOUT = [
   // "Destaques" entra no fim da coluna 1, que tinha ~460px livres — nada acima se move
   ['Estados Unidos', 'Brasil', 'Destaques', 'FearGreed'],
   ['Commodities', 'IndicesMundiais', 'JurosReais'],
-  // 'Bolsas' entra no fim da coluna 3, a que tinha mais espaço livre (~176px)
-  ['Bancos', 'Energia', 'Seguros', 'Saneamento', 'Telecom', 'Petróleo & Gás', 'Bolsas'],
+  ['Bancos', 'Energia', 'Seguros', 'Saneamento', 'Telecom', 'Petróleo & Gás'],
   ['Mineração', 'Papel & Celulose', 'Metalurgia & Siderurgia', 'Químicos & Petroquímicos', 'Outros', 'MAG7 (S&P 500)'],
   ['AgendaIBGE', 'CalendarioEconomico', 'NoticiasMacro', 'NoticiasEmpresas'],
 ];

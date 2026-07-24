@@ -129,28 +129,30 @@ const GROUPS = [
 // O COLCAP (Colômbia) não existe no Yahoo Finance, por isso ficou de fora.
 // `flag`: código ISO usado nas bandeiras do flagcdn.com
 const WORLD_INDICES = [
+// `tz`/`abre`/`fecha`: fuso e pregão regular de cada praça, para o relógio e o
+// indicador de aberto/fechado exibidos na própria tabela.
   { region: 'Américas', items: [
-    { symbol: '^DJI', label: 'Dow Jones', flag: 'us' },
-    { symbol: '^GSPC', label: 'S&P 500', flag: 'us' },
-    { symbol: '^IXIC', label: 'Nasdaq', flag: 'us' },
-    { symbol: '^GSPTSE', label: 'S&P/TSX Comp', flag: 'ca' },
-    { symbol: '^MXX', label: 'S&P/BMV IPC', flag: 'mx' },
-    { symbol: '^BVSP', label: 'Ibovespa', flag: 'br' },
-    { symbol: '^IPSA', label: 'Chile IPSA', flag: 'cl' },
-    { symbol: '^MERV', label: 'ARG MERVAL', flag: 'ar' },
-    { symbol: '^SPBLPGPT', label: 'Peru S&P/BVL', flag: 'pe' },
+    { symbol: '^DJI', label: 'Dow Jones', flag: 'us', tz: 'America/New_York', abre: '09:30', fecha: '16:00' },
+    { symbol: '^GSPC', label: 'S&P 500', flag: 'us', tz: 'America/New_York', abre: '09:30', fecha: '16:00' },
+    { symbol: '^IXIC', label: 'Nasdaq', flag: 'us', tz: 'America/New_York', abre: '09:30', fecha: '16:00' },
+    { symbol: '^GSPTSE', label: 'S&P/TSX Comp', flag: 'ca', tz: 'America/Toronto', abre: '09:30', fecha: '16:00' },
+    { symbol: '^MXX', label: 'S&P/BMV IPC', flag: 'mx', tz: 'America/Mexico_City', abre: '08:30', fecha: '15:00' },
+    { symbol: '^BVSP', label: 'Ibovespa', flag: 'br', tz: 'America/Sao_Paulo', abre: '10:00', fecha: '17:00' },
+    { symbol: '^IPSA', label: 'Chile IPSA', flag: 'cl', tz: 'America/Santiago', abre: '09:30', fecha: '17:00' },
+    { symbol: '^MERV', label: 'ARG MERVAL', flag: 'ar', tz: 'America/Argentina/Buenos_Aires', abre: '11:00', fecha: '17:00' },
+    { symbol: '^SPBLPGPT', label: 'Peru S&P/BVL', flag: 'pe', tz: 'America/Lima', abre: '09:00', fecha: '15:00' },
   ]},
   { region: 'EMEA', items: [
-    { symbol: '^STOXX50E', label: 'Euro Stoxx 50', flag: 'eu' },
-    { symbol: '^FTSE', label: 'FTSE 100', flag: 'gb' },
-    { symbol: '^FCHI', label: 'CAC 40', flag: 'fr' },
-    { symbol: '^GDAXI', label: 'DAX', flag: 'de' },
+    { symbol: '^STOXX50E', label: 'Euro Stoxx 50', flag: 'eu', tz: 'Europe/Berlin', abre: '09:00', fecha: '17:30' },
+    { symbol: '^FTSE', label: 'FTSE 100', flag: 'gb', tz: 'Europe/London', abre: '08:00', fecha: '16:30' },
+    { symbol: '^FCHI', label: 'CAC 40', flag: 'fr', tz: 'Europe/Paris', abre: '09:00', fecha: '17:30' },
+    { symbol: '^GDAXI', label: 'DAX', flag: 'de', tz: 'Europe/Berlin', abre: '09:00', fecha: '17:30' },
   ]},
   { region: 'Ásia/Pacífico', items: [
-    { symbol: '^N225', label: 'Nikkei', flag: 'jp' },
-    { symbol: '^HSI', label: 'Hang Seng', flag: 'hk' },
-    { symbol: '000300.SS', label: 'CSI 300', flag: 'cn' },
-    { symbol: '^AXJO', label: 'S&P/ASX 200', flag: 'au' },
+    { symbol: '^N225', label: 'Nikkei', flag: 'jp', tz: 'Asia/Tokyo', abre: '09:00', fecha: '15:00' },
+    { symbol: '^HSI', label: 'Hang Seng', flag: 'hk', tz: 'Asia/Hong_Kong', abre: '09:30', fecha: '16:00' },
+    { symbol: '000300.SS', label: 'CSI 300', flag: 'cn', tz: 'Asia/Shanghai', abre: '09:30', fecha: '15:00' },
+    { symbol: '^AXJO', label: 'S&P/ASX 200', flag: 'au', tz: 'Australia/Sydney', abre: '10:00', fecha: '16:00' },
   ]},
 ];
 
