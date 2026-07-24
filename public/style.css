@@ -364,6 +364,39 @@ body.tv-mode .hl-value { font-size: 38px; }
 }
 body.tv-mode .row-note { font-size: 9.5px; }
 
+/* ---- Relógio das bolsas globais ---- */
+.clk-row {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) 44px 74px;
+  align-items: center;
+  gap: 6px;
+}
+.clk-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--gray-flat);
+}
+.clk-dot.on { background: var(--green-up); box-shadow: 0 0 0 2px rgba(26,127,55,0.18); }
+.clk-cidade {
+  font-weight: 600; font-size: 12.5px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.clk-hora {
+  text-align: right; font-weight: 700; font-size: 13px;
+  font-variant-numeric: tabular-nums; color: var(--text-muted);
+}
+.clk-hora.on { color: var(--green-up); }        /* pregão aberto */
+.clk-sessao {
+  text-align: right; font-size: 10.5px; color: var(--text-muted);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+body.tv-mode .clk-row {
+  grid-template-columns: 10px minmax(0, 1fr) 42px 74px;
+  padding-top: 1px; padding-bottom: 1px;
+}
+body.tv-mode .clk-cidade { font-size: 12px; }
+body.tv-mode .clk-hora { font-size: 12.5px; }
+body.tv-mode .clk-sessao { font-size: 10px; }
+
 /* ---- Medidor do Fear & Greed ---- */
 /* dois medidores lado a lado (EUA e Brasil) — cabem na altura de um só */
 .fng-body {

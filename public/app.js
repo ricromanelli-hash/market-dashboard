@@ -248,6 +248,74 @@ function renderSentimentoCard(fg, br) {
     </section>`;
 }
 
+// ---- Relógio das principais bolsas ----
+// Horários de pregão regular, em hora local de cada praça. Os fusos (e o horário de
+// verão) são resolvidos pelo próprio navegador via Intl — sem API externa.
+const BOLSAS = [
+  { cidade: 'São Paulo', tz: 'America/Sao_Paulo', abre: '10:00', fecha: '17:00' },
+  { cidade: 'Nova York', tz: 'America/New_York', abre: '09:30', fecha: '16:00' },
+  { cidade: 'Londres', tz: 'Europe/London', abre: '08:00', fecha: '16:30' },
+  { cidade: 'Tóquio', tz: 'Asia/Tokyo', abre: '09:00', fecha: '15:00' },
+  { cidade: 'Hong Kong', tz: 'Asia/Hong_Kong', abre: '09:30', fecha: '16:00' },
+  { cidade: 'Sydney', tz: 'Australia/Sydney', abre: '10:00', fecha: '16:00' },
+];
+
+const minutos = (hhmm) => {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+};
+
+// Hora local e dia da semana naquele fuso, na hora atual.
+function agoraEm(tz) {
+  const p = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false, weekday: 'short',
+  }).formatToParts(new Date());
+  const get = (t) => p.find((x) => x.type === t)?.value;
+  const h = Number(get('hour')) % 24; // 24 significa meia-noite em alguns ambientes
+  const m = Number(get('minute'));
+  return { hhmm: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
+           min: h * 60 + m, semana: get('weekday') };
+}
+
+// Não considera feriados locais nem intervalo de almoço (Tóquio/HK) — é uma
+// indicação de horário de pregão, não um status oficial da bolsa.
+function estadoBolsa(b) {
+  const { hhmm, min, semana } = agoraEm(b.tz);
+  const util = !['Sat', 'Sun'].includes(semana);
+  const aberta = util && min >= minutos(b.abre) && min < minutos(b.fecha);
+  return { hhmm, aberta };
+}
+
+function renderBolsasCard() {
+  const linhas = BOLSAS.map((b) => {
+    const { hhmm, aberta } = estadoBolsa(b);
+    return `
+      <div class="row clk-row" data-tz="${b.tz}" data-abre="${b.abre}" data-fecha="${b.fecha}">
+        <span class="clk-dot ${aberta ? 'on' : 'off'}"></span>
+        <span class="clk-cidade">${b.cidade}</span>
+        <span class="clk-hora ${aberta ? 'on' : ''}">${hhmm}</span>
+        <span class="clk-sessao">${b.abre}–${b.fecha}</span>
+      </div>`;
+  }).join('');
+  return `
+    <section class="card">
+      <div class="card-header">Bolsas Globais</div>
+      <div class="card-body">${linhas}</div>
+    </section>`;
+}
+
+// Atualiza só os relógios, sem refazer o painel inteiro.
+function atualizarRelogios() {
+  document.querySelectorAll('.clk-row').forEach((row) => {
+    const b = { tz: row.dataset.tz, abre: row.dataset.abre, fecha: row.dataset.fecha };
+    const { hhmm, aberta } = estadoBolsa(b);
+    const hora = row.querySelector('.clk-hora');
+    const dot = row.querySelector('.clk-dot');
+    if (hora) { hora.textContent = hhmm; hora.classList.toggle('on', aberta); }
+    if (dot) { dot.classList.toggle('on', aberta); dot.classList.toggle('off', !aberta); }
+  });
+}
+
 // Card de destaques: poucos números em fonte grande, para leitura à distância na TV.
 const ptsFmt = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
 const brlFmt = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
@@ -486,6 +554,7 @@ function cardBuilders(data) {
   const builders = {
     'Destaques': () => renderHighlightsCard(data),
     'FearGreed': () => renderSentimentoCard(data.fearGreed, data.sentimentoBr),
+    'Bolsas': () => renderBolsasCard(),
     'Estados Unidos': () => renderGroupCard('Estados Unidos', g['Estados Unidos'], renderCpiRow(data.cpi)),
     'Brasil': () => renderGroupCard('Brasil', g['Brasil'], renderBrasilRatesRows(data.brasilRates)),
     'IndicesMundiais': () => renderWorldIndicesCard(data.worldIndices),
@@ -508,7 +577,8 @@ const TV_LAYOUT = [
   // "Destaques" entra no fim da coluna 1, que tinha ~460px livres — nada acima se move
   ['Estados Unidos', 'Brasil', 'Destaques', 'FearGreed'],
   ['Commodities', 'IndicesMundiais', 'JurosReais'],
-  ['Bancos', 'Energia', 'Seguros', 'Saneamento', 'Telecom', 'Petróleo & Gás'],
+  // 'Bolsas' entra no fim da coluna 3, a que tinha mais espaço livre (~176px)
+  ['Bancos', 'Energia', 'Seguros', 'Saneamento', 'Telecom', 'Petróleo & Gás', 'Bolsas'],
   ['Mineração', 'Papel & Celulose', 'Metalurgia & Siderurgia', 'Químicos & Petroquímicos', 'Outros', 'MAG7 (S&P 500)'],
   ['AgendaIBGE', 'CalendarioEconomico', 'NoticiasMacro', 'NoticiasEmpresas'],
 ];
@@ -593,3 +663,5 @@ if (TV_MODE) {
 ensureCalendarWidget(); // o iframe é montado uma vez, nos dois modos
 loadData();
 setInterval(loadData, 30_000);
+// os relógios andam sozinhos, sem esperar o refresh de 30s dos dados
+setInterval(atualizarRelogios, 10_000);
