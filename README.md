@@ -91,6 +91,13 @@ Três detalhes da leitura (`refreshAgendaEmpresas` em [server.js](server.js)):
 - **Caixa do `tipo_evento` normalizada.** A tabela tem "Divulgação resultado" e
   "Divulgação Resultado" como valores distintos — resquício de uma carga de 17/07/2025.
   O rótulo é unificado na exibição; o banco não é alterado.
+- **Rótulo curto por evento.** Cada linha do card ocupa uma linha só, então o rótulo
+  exibido é abreviado ("Divulg.", "Call", "Após fech."); o texto inteiro e a data por
+  extenso ficam no `title` da linha. O mapa está em `EVENTOS`, em [server.js](server.js)
+  — `tipo_evento` novo que não esteja lá aparece com o texto cru do banco.
+- **Eventos sem empresa identificável são omitidos.** Parte dos `cd_cvm` da tabela não
+  existe em `ac_empresa` nem em `ac_ticker` (emissores de dívida, companhias fechadas):
+  sem ticker e sem nome a linha não identificaria ninguém.
 
 ### Termômetro do Mercado
 

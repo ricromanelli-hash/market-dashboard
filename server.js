@@ -1135,13 +1135,22 @@ function somaDias(iso, dias) {
 
 // A tabela guarda o mesmo evento em duas caixas ("Divulgação resultado" e "Divulgação
 // Resultado"), herdadas de cargas diferentes. Unifica o rótulo na exibição.
+// `curto` é o que cabe na linha do card; o rótulo inteiro vai no title= da linha.
+// As duas últimas entraram numa carga de 24/07/2026 e trazem o horário da divulgação —
+// são "divulgação de resultado" com a informação extra de antes/depois do pregão.
+const EVENTOS = [
+  { prefixo: 'divulgacao resultado', label: 'Divulgação de resultado', curto: 'Divulg.' },
+  { prefixo: 'conferencia resultado', label: 'Conferência de resultado', curto: 'Call' },
+  { prefixo: 'dia do investidor', label: 'Dia do investidor', curto: 'Inv. Day' },
+  { prefixo: 'resultado - apos o fechamento', label: 'Resultado — após o fechamento', curto: 'Após fech.' },
+  { prefixo: 'resultado - antes da abertura', label: 'Resultado — antes da abertura', curto: 'Antes abert.' },
+];
+
 function rotuloEvento(tipo) {
   const bruto = String(tipo || '').trim();
   const chave = normalizeText(bruto);
-  if (chave.startsWith('divulgacao resultado')) return 'Divulgação de resultado';
-  if (chave.startsWith('conferencia resultado')) return 'Conferência de resultado';
-  if (chave.startsWith('dia do investidor')) return 'Dia do investidor';
-  return bruto;
+  const achado = EVENTOS.find((e) => chave.startsWith(e.prefixo));
+  return achado || { label: bruto, curto: bruto };
 }
 
 // Papel exibido: de preferência o que o painel já acompanha nos cards de setor, para o
@@ -1161,10 +1170,17 @@ function escolhePapel(papeis) {
   })[0];
 }
 
-// "TAESA UNT" -> "TAESA". Sem nome_curto, cai no nome de mercado (bem mais longo).
+// "TAESA UNT" -> "TAESA". Quando o nome é longo a B3 trunca e cola o tipo sem espaço
+// ("SANTANDER BRUNT", "ENGIE BRASILON"), por isso o espaço é opcional — e o sufixo
+// removido é só o que corresponde ao tipo daquele papel, para não comer as letras
+// finais de um nome que por acaso termine em ON/PN. Sem nome_curto, cai no nome de
+// mercado (bem mais longo).
+const SUFIXO_POR_TIPO = { ON: 'ON', PN: 'PN[AB]?', UNIT: 'UNT' };
+
 function nomeCurtoLimpo(papel, nomeMercado) {
   const bruto = String(papel?.nome_curto || '').trim();
-  const limpo = bruto.replace(/\s+(ON|PN|PNA|PNB|PNC|UNT|UNIT)$/i, '').trim();
+  const sufixo = SUFIXO_POR_TIPO[papel?.tipo_ticker];
+  const limpo = sufixo ? bruto.replace(new RegExp(`\\s*${sufixo}$`), '').trim() : bruto;
   return limpo || String(nomeMercado || '').trim();
 }
 
@@ -1210,13 +1226,18 @@ async function carregaAgendaEmpresas() {
   }
   const lista = eventos.map((ev) => {
     const papel = escolhePapel(papeisPorCvm.get(ev.cd_cvm) || []);
+    const rotulo = rotuloEvento(ev.tipo_evento);
     return {
       date: ev.dt_evento, // YYYY-MM-DD
-      ticker: papel?.ticker || `CVM ${ev.cd_cvm}`,
+      ticker: papel?.ticker || null,
       empresa: nomeCurtoLimpo(papel, nomePorCvm.get(ev.cd_cvm)),
-      evento: rotuloEvento(ev.tipo_evento),
+      evento: rotulo.label,
+      eventoCurto: rotulo.curto,
     };
-  });
+  // Parte dos cd_cvm da tabela não existe em ac_empresa nem em ac_ticker (emissores de
+  // dívida, companhias fechadas). Sem ticker e sem nome a linha não identifica ninguém
+  // — viraria "CVM 19968" em branco —, então fica de fora.
+  }).filter((ev) => ev.ticker || ev.empresa);
   // data mais próxima no topo; no mesmo dia, agrupa por evento e depois por ticker
   lista.sort((a, b) => a.date.localeCompare(b.date)
     || a.evento.localeCompare(b.evento)

@@ -506,6 +506,9 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]
 ));
 
+// "seg., 27/07" — versão curta de dayFmt, para a linha caber inteira na coluna.
+const diaMesFmt = new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' });
+
 // Eventos das empresas (divulgação/conferência de resultado, dia do investidor) dos
 // próximos 7 dias contando hoje — a data mais próxima fica no topo.
 function renderAgendaEmpresasCard(agenda) {
@@ -522,18 +525,19 @@ function renderAgendaEmpresasCard(agenda) {
       // só monta a URL do ícone se for mesmo um ticker da B3: sem papel resolvido o
       // backend devolve "CVM 20257", que não vira ícone nenhum e ainda entraria cru
       // no atributo src.
-      const logo = /^[A-Z]{4}\d{1,2}$/.test(ev.ticker) ? logoImg(null, ev.ticker) : '';
+      const logo = /^[A-Z]{4}\d{1,2}$/.test(ev.ticker || '')
+        ? logoImg(null, ev.ticker)
+        : '<span class="row-logo"></span>'; // mantém a coluna, para os nomes alinharem
+      // o rótulo inteiro do evento não cabe na linha: fica no title, junto com a data
+      // por extenso, e a linha mostra as versões curtas.
+      const titulo = [ev.ticker, ev.empresa, ev.evento, dayFmt.format(dt)].filter(Boolean).join(' · ');
       return `
-      <div class="row">
+      <div class="row row-agenda" title="${esc(titulo)}">
         ${logo}
-        <div class="row-label">
-          <span class="row-name">${esc(ev.ticker)}</span>
-          <span class="row-symbol">${esc(ev.empresa)}</span>
-        </div>
-        <div class="ev-info">
-          <span class="ev-tipo">${esc(ev.evento)}</span>
-          <span class="cal-date">${dayFmt.format(dt)}</span>
-        </div>
+        <span class="row-name">${esc(ev.ticker || '')}</span>
+        <span class="row-symbol">${esc(ev.empresa)}</span>
+        <span class="ev-tag">${esc(ev.eventoCurto || ev.evento)}</span>
+        <span class="ev-data">${diaMesFmt.format(dt)}</span>
       </div>`;
     }).join('');
   }

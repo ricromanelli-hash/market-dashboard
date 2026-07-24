@@ -546,22 +546,36 @@ body.tv-mode .row-values { grid-template-columns: 78px 76px; gap: 10px; }
 .row-change.down { color: var(--red-down); }
 .row-change.flat { color: var(--gray-flat); }
 
-/* coluna direita da Agenda das Empresas: tipo do evento acima da data */
-.ev-info {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 1px;
-  min-width: 0;
+/* Agenda das Empresas: um evento por linha, em colunas fixas (logo · ticker · nome ·
+   evento · data), para caber mais eventos e as colunas baterem entre as linhas.
+   O nome é a única coluna elástica — é ela que encolhe quando falta espaço. */
+.row-agenda {
+  display: grid;
+  grid-template-columns: 20px auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
 }
 
-.ev-tipo {
-  font-size: 10.5px;
-  color: var(--text-muted);
+.row-agenda .row-symbol,
+.ev-tag {
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-body.tv-mode .ev-tipo { font-size: 11px; }
+.ev-tag { font-size: 10px; color: var(--text-muted); }
+
+.ev-data {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--green-header);
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
+body.tv-mode .ev-tag { font-size: 10.5px; }
+body.tv-mode .ev-data { font-size: 11.5px; }
 
 .row-unavailable {
   font-size: 12px;
