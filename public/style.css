@@ -519,13 +519,17 @@ body.tv-mode .row-spark svg { width: 22px; }
    dimensionava pelo próprio conteúdo e as colunas não batiam entre si. */
 .row-values {
   display: grid;
-  grid-template-columns: 76px 56px;
+  /* a variação precisa comportar "↗ +0,57 p.p.", mais longa que "↘ -1,2%".
+     No modo normal a fonte é maior, então a coluna cresce (ver regra abaixo). */
+  grid-template-columns: 74px 72px;
   align-items: center;
   gap: 6px;
   white-space: nowrap;
 }
 .row-values > .row-price { text-align: right; }
 .row-values > .row-change { justify-content: flex-end; }
+/* na TV a fonte é menor: as colunas podem ser mais estreitas */
+body.tv-mode .row-values { grid-template-columns: 68px 64px; }
 
 .row-price { font-weight: 600; }
 
