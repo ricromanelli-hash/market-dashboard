@@ -9,10 +9,13 @@ const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) MarketDashboard/1.0';
 
 // Cotações de índices, moedas, commodities e ações (fonte: Yahoo Finance, API não oficial).
 const GROUPS = [
+  // `hidden`: continua sendo buscado e vai no /api/data, mas não vira linha no card.
+  // S&P 500, Ibovespa e Dólar saíram das listas a pedido — porém são exatamente os três
+  // números do card Destaques, que os lê daqui. Nasdaq e Dow Jones não têm outro
+  // consumidor e foram removidos de vez; os quatro índices seguem no card Índices
+  // Mundiais, que mantém a própria lista (WORLD_INDICES).
   { title: 'Estados Unidos', items: [
-    { symbol: '^GSPC', label: 'S&P 500' },
-    { symbol: '^IXIC', label: 'NASDAQ' },
-    { symbol: '^DJI', label: 'Dow Jones' },
+    { symbol: '^GSPC', label: 'S&P 500', hidden: true },
     { symbol: '^RUT', label: 'Russell 2000' },
     { symbol: 'DX-Y.NYB', label: 'DXY' },
     { symbol: '^VIX', label: 'VIX' },
@@ -20,8 +23,8 @@ const GROUPS = [
     { symbol: '^TYX', label: 'US 30-Year' },
   ]},
   { title: 'Brasil', items: [
-    { symbol: '^BVSP', label: 'Ibovespa' },
-    { symbol: 'BRL=X', label: 'Dólar', displaySymbol: 'USDBRL=X' },
+    { symbol: '^BVSP', label: 'Ibovespa', hidden: true },
+    { symbol: 'BRL=X', label: 'Dólar', displaySymbol: 'USDBRL=X', hidden: true },
     { symbol: 'EWZ', label: 'EWZ (MSCI Brazil)', prePost: true },
   ]},
   { title: 'Commodities', items: [

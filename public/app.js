@@ -395,7 +395,9 @@ function renderRealRatesCard(rows) {
 }
 
 function renderGroupCard(title, items, extraRows = '') {
-  const rows = (items || []).map(renderQuoteRow).join('');
+  // `hidden`: item que o backend busca para outro card (Destaques) e que não deve
+  // aparecer como linha aqui.
+  const rows = (items || []).filter((it) => !it.hidden).map(renderQuoteRow).join('');
   const body = (rows || '<p class="row-unavailable" style="padding:12px">carregando…</p>') + extraRows;
   return `
     <section class="card">
