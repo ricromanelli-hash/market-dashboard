@@ -519,8 +519,13 @@ function renderAgendaEmpresasCard(agenda) {
     body = eventos.map((ev) => {
       const [y, m, d] = String(ev.date).split('-').map(Number);
       const dt = new Date(y, m - 1, d);
+      // só monta a URL do ícone se for mesmo um ticker da B3: sem papel resolvido o
+      // backend devolve "CVM 20257", que não vira ícone nenhum e ainda entraria cru
+      // no atributo src.
+      const logo = /^[A-Z]{4}\d{1,2}$/.test(ev.ticker) ? logoImg(null, ev.ticker) : '';
       return `
       <div class="row">
+        ${logo}
         <div class="row-label">
           <span class="row-name">${esc(ev.ticker)}</span>
           <span class="row-symbol">${esc(ev.empresa)}</span>
