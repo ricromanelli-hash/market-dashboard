@@ -35,12 +35,16 @@ body.tv-mode .pair-group > .card { margin-bottom: 10px; }
   border-bottom: 1px solid var(--border);
 }
 
+/* grid de colunas fixas (bandeira · nome · hora · gráfico · valores): com flex cada
+   linha se dimensionava pelo próprio conteúdo e as colunas ficavam desalinhadas */
 .row.idx-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 34px 44px 66px;
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
 }
+.idx-row .idx-values { justify-content: flex-end; }
 
 /* bandeira do país da bolsa */
 .idx-flag {
@@ -638,7 +642,10 @@ body.tv-mode .tv-col > * { margin-bottom: 10px; }
 body.tv-mode .tv-col > *:last-child { margin-bottom: 0; }
 
 /* índices mundiais compactos na TV: valor e % na mesma linha do nome */
-body.tv-mode .row.idx-row { padding: 3px 8px; gap: 4px; line-height: 1.45; }
+body.tv-mode .row.idx-row {
+  grid-template-columns: 18px minmax(0, 1fr) 32px 32px 92px;
+  padding: 3px 8px; gap: 4px; line-height: 1.45;
+}
 body.tv-mode .idx-region { font-size: 9.5px; padding: 2px 8px; }
 body.tv-mode .idx-name { font-size: 11px; }
 body.tv-mode .idx-values { flex-direction: row; align-items: baseline; gap: 5px; }
