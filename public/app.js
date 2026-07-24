@@ -187,11 +187,13 @@ function flagImg(code, cls = 'idx-flag') {
 }
 
 // Medidor (velocímetro) do Fear & Greed Index, no estilo do gráfico da CNN.
+// `ate` é o limite superior INCLUSIVO da faixa, comparado com o valor já arredondado
+// (o mesmo número que aparece no medidor). Neutro é só o 50 exato.
 const FNG_FAIXAS = [
-  { ate: 25, cor: '#c62828', nome: 'MEDO EXTREMO' },
-  { ate: 45, cor: '#ef6c00', nome: 'MEDO' },
-  { ate: 55, cor: '#9e9e9e', nome: 'NEUTRO' },
-  { ate: 75, cor: '#7cb342', nome: 'GANÂNCIA' },
+  { ate: 24, cor: '#d32f2f', nome: 'MEDO EXTREMO' },
+  { ate: 49, cor: '#ef6c00', nome: 'MEDO' },
+  { ate: 50, cor: '#9e9e9e', nome: 'NEUTRO' },
+  { ate: 74, cor: '#7cb342', nome: 'GANÂNCIA' },
   { ate: 100, cor: '#1a7f37', nome: 'GANÂNCIA EXTREMA' },
 ];
 
@@ -216,28 +218,33 @@ function renderGauge(score, titulo, nota) {
       <p class="row-unavailable" style="padding:10px 0">carregando…</p></div>`;
   }
   const cx = 100, cy = 92, rInt = 46, rExt = 82;
-  const faixa = FNG_FAIXAS.find((f) => score <= f.ate) || FNG_FAIXAS[FNG_FAIXAS.length - 1];
+  const bruto = Math.min(100, Math.max(0, score));
+  const valor = Math.round(bruto);
+  const faixa = FNG_FAIXAS.find((f) => valor <= f.ate) || FNG_FAIXAS[FNG_FAIXAS.length - 1];
+  // As faixas contam inteiros; o arco vai meio ponto além do limite para as fatias
+  // ficarem contíguas e o neutro virar um traço centrado no 50.
   let de = 0;
-  const arcos = FNG_FAIXAS.map((f) => {
-    const d = fngArco(de, f.ate, rInt, rExt, cx, cy);
+  const arcos = FNG_FAIXAS.map((f, i) => {
+    const ate = i === FNG_FAIXAS.length - 1 ? 100 : f.ate + 0.5;
+    const d = fngArco(de, ate, rInt, rExt, cx, cy);
     const atual = f === faixa;
-    de = f.ate;
+    de = ate;
     return `<path d="${d}" fill="${f.cor}" opacity="${atual ? 1 : 0.28}"/>`;
   }).join('');
-  const [px, py] = fngPonto(score, rExt - 6, cx, cy);
-  const marcas = [0, 50, 100].map((v) => {
+  const [px, py] = fngPonto(bruto, rExt - 6, cx, cy);
+  const marcas = [0, 25, 50, 75, 100].map((v) => {
     const [tx, ty] = fngPonto(v, rExt + 11, cx, cy);
     return `<text x="${tx}" y="${ty}" class="fng-tick">${v}</text>`;
   }).join('');
   return `
     <div class="fng-item">
       <div class="fng-titulo">${titulo}</div>
-      <svg viewBox="0 0 200 116" class="fng-svg" role="img" aria-label="${titulo} ${score}">
+      <svg viewBox="0 -12 200 128" class="fng-svg" role="img" aria-label="${titulo} ${valor}">
         ${arcos}
         ${marcas}
         <line x1="${cx}" y1="${cy}" x2="${px}" y2="${py}" class="fng-agulha"/>
         <circle cx="${cx}" cy="${cy}" r="7" class="fng-centro"/>
-        <text x="${cx}" y="${cy + 26}" class="fng-valor" fill="${faixa.cor}">${Math.round(score)}</text>
+        <text x="${cx}" y="${cy + 26}" class="fng-valor" fill="${faixa.cor}">${valor}</text>
       </svg>
       <div class="fng-rotulo" style="color:${faixa.cor}">${faixa.nome}</div>
       <div class="fng-hist">${nota}</div>
