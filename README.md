@@ -24,11 +24,6 @@ Depois abra http://localhost:3000 no navegador.
 - Local: `$env:NOME = "valor"` antes de `npm start`
 - Render: *Dashboard → seu serviço → Environment → Add Environment Variable*
 
-`ALPHAVANTAGE_KEY` — chave do [Alpha Vantage](https://www.alphavantage.co/), usada só
-para a taxa de desemprego dos EUA na tabela de Juros Reais. Sem ela, a coluna fica
-vazia. O plano gratuito permite 25 requisições/dia, por isso o valor é cacheado por
-12 horas.
-
 `SUPABASE_URL` e `SUPABASE_ANON_KEY` — projeto Supabase que alimenta o card
 **Agenda das Empresas**. Sem elas o card só avisa que falta configurar; o resto do
 painel não é afetado.
@@ -121,12 +116,14 @@ Tudo derivado das séries do Yahoo que o painel já busca para os mini-gráficos
 requisição extra. Se menos de 3 componentes puderem ser calculados, o índice não é
 publicado (o card mostra "carregando…").
 
-### O que **não** foi implementado (sem fonte gratuita confiável)
+### Dados dos EUA (BLS)
 
-- **CPI (EUA)**: o BLS (Bureau of Labor Statistics) tem API pública, mas exige
-  cadastro de chave e o dado só muda uma vez por mês — por isso ficou como
-  placeholder ("—"), igual ao painel original. Se quiser, dá para plugar a
-  série `CUUR0000SA0` da API do BLS em `refreshSlowData()`.
+CPI e desemprego vêm da **API pública v1 do BLS** (Bureau of Labor Statistics), que não
+exige cadastro de chave: séries `CUUR0000SA0` (CPI, variação em 12 meses calculada aqui)
+e `LNS14000000` (taxa de desemprego, com ajuste sazonal).
+
+A v1 limita ~25 requisições/dia por IP e os dois dados são mensais, então ficam
+cacheados — 6h o CPI e 12h o desemprego, bem abaixo do limite.
 
 ## Estrutura
 

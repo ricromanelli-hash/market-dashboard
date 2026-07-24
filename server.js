@@ -706,27 +706,26 @@ async function fetchCsv(url, label) {
   return parseCsv(await res.text());
 }
 
-// Desemprego dos EUA (Alpha Vantage, mensal). A chave vem do ambiente — o repositório
-// é público, então ela nunca entra no código. Sem chave, a coluna fica vazia.
-// O plano gratuito permite 25 requisições/dia; como o dado é mensal, cacheamos 12h.
-const ALPHA_KEY = process.env.ALPHAVANTAGE_KEY || '';
+// Desemprego dos EUA (BLS, mensal). Série LNS14000000 = taxa de desemprego, com ajuste sazonal. Mesma API pública
+// do CPI, sem chave: a v1 limita ~25 requisições/dia por IP e o dado é mensal, daí o
+// cache de 12h (junto com o CPI, dá menos de 10 chamadas por dia).
+const BLS_UNEMP_URL = 'https://api.bls.gov/publicAPI/v1/timeseries/data/LNS14000000';
 const UNEMP_MIN_INTERVAL_MS = 12 * 60 * 60 * 1000;
 let lastUnempFetch = 0;
 let usUnemployment = null; // { value, date }
 
 async function refreshUnemployment() {
-  // falha explícita: sem isso a coluna some sem explicação e é difícil diagnosticar
-  if (!ALPHA_KEY) throw new Error('Desemprego EUA: falta a variável ALPHAVANTAGE_KEY (Render → Environment)');
   if (usUnemployment && Date.now() - lastUnempFetch < UNEMP_MIN_INTERVAL_MS) return;
-  const url = `https://www.alphavantage.co/query?function=UNEMPLOYMENT&apikey=${ALPHA_KEY}`;
-  const data = await fetchJsonWithRetry(url, 'Alpha Vantage desemprego', 2, 30000);
-  if (data?.Note || data?.Information) {
-    throw new Error('Alpha Vantage: limite de requisições atingido');
-  }
-  const first = data?.data?.[0];
-  const v = parseFloat(first?.value);
-  if (!Number.isFinite(v)) throw new Error('Alpha Vantage: sem dado de desemprego');
-  usUnemployment = { value: +v.toFixed(1), date: String(first.date).slice(0, 7) };
+  const data = await fetchJsonWithRetry(BLS_UNEMP_URL, 'BLS desemprego', 2, 45000);
+  const series = data?.Results?.series?.[0]?.data;
+  if (!Array.isArray(series) || series.length === 0) throw new Error('BLS desemprego: sem dados');
+  // o BLS usa "-" nos meses sem apuração, então pega o mais recente que seja numérico
+  const ultimo = series.find((p) => Number.isFinite(parseFloat(p.value)));
+  if (!ultimo) throw new Error('BLS desemprego: sem valor numérico');
+  usUnemployment = {
+    value: +parseFloat(ultimo.value).toFixed(1),
+    date: `${ultimo.year}-${String(ultimo.period).replace(/^M/, '')}`, // "M06" -> "2026-06"
+  };
   lastUnempFetch = Date.now();
 }
 
