@@ -521,15 +521,16 @@ body.tv-mode .row-spark svg { width: 22px; }
   display: grid;
   /* a variação precisa comportar "↗ +0,57 p.p.", mais longa que "↘ -1,2%".
      No modo normal a fonte é maior, então a coluna cresce (ver regra abaixo). */
-  grid-template-columns: 74px 72px;
+  grid-template-columns: 86px 84px;
   align-items: center;
-  gap: 6px;
+  gap: 12px; /* respiro: com pouco espaço o "%" encosta na seta da variação */
   white-space: nowrap;
 }
 .row-values > .row-price { text-align: right; }
 .row-values > .row-change { justify-content: flex-end; }
 /* na TV a fonte é menor: as colunas podem ser mais estreitas */
-body.tv-mode .row-values { grid-template-columns: 68px 64px; }
+/* preço dimensionado para o maior valor ("176.723,62"), senão ele vaza da coluna */
+body.tv-mode .row-values { grid-template-columns: 78px 76px; gap: 10px; }
 
 .row-price { font-weight: 600; }
 
