@@ -1109,7 +1109,15 @@ async function supabaseSelect(tabela, query) {
     },
     signal: AbortSignal.timeout(20000),
   });
-  if (!res.ok) throw new Error(`Supabase ${tabela}: HTTP ${res.status}`);
+  if (!res.ok) {
+    // O PostgREST explica no corpo o que faltou (grant ausente, policy, coluna
+    // inexistente...). Sem isso o erro vira um "HTTP 401" sem pista nenhuma.
+    const detalhe = await res.text().then(
+      (t) => { try { return JSON.parse(t).message || t; } catch { return t; } },
+      () => '',
+    );
+    throw new Error(`Supabase ${tabela}: HTTP ${res.status}${detalhe ? ` — ${detalhe}` : ''}`);
+  }
   return res.json();
 }
 
@@ -1169,6 +1177,17 @@ async function refreshAgendaEmpresas() {
     };
     return;
   }
+  try {
+    await carregaAgendaEmpresas();
+  } catch (err) {
+    // Sem isto a agenda ficaria no valor inicial e o card diria "sem eventos", que é
+    // indistinguível de uma semana realmente vazia. O erro também sobe para a barra.
+    cache.agendaEmpresas = { unavailable: true, reason: err.message };
+    throw err;
+  }
+}
+
+async function carregaAgendaEmpresas() {
   const de = hojeSaoPaulo();
   const ate = somaDias(de, AGENDA_DIAS - 1);
   const eventos = await supabaseSelect(
