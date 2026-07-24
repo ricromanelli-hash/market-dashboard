@@ -95,9 +95,11 @@ Três detalhes da leitura (`refreshAgendaEmpresas` em [server.js](server.js)):
   exibido é abreviado ("Divulg.", "Call", "Após fech."); o texto inteiro e a data por
   extenso ficam no `title` da linha. O mapa está em `EVENTOS`, em [server.js](server.js)
   — `tipo_evento` novo que não esteja lá aparece com o texto cru do banco.
-- **Eventos sem empresa identificável são omitidos.** Parte dos `cd_cvm` da tabela não
-  existe em `ac_empresa` nem em `ac_ticker` (emissores de dívida, companhias fechadas):
-  sem ticker e sem nome a linha não identificaria ninguém.
+- **Só empresas acompanhadas pelo painel.** O card lista apenas companhias cujo papel
+  aparece nos cards de setor (Bancos, Energia, Mineração…), pelo `GROUPS` do
+  [server.js](server.js). Isso também descarta os `cd_cvm` que sequer existem em
+  `ac_ticker` — emissores de dívida e companhias fechadas, que não identificariam ninguém.
+  Para ver uma empresa nova na agenda, basta incluir o ticker dela em `GROUPS`.
 
 ### Termômetro do Mercado
 

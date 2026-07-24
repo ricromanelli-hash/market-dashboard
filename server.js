@@ -1145,21 +1145,34 @@ function somaDias(iso, dias) {
 // A tabela guarda o mesmo evento em duas caixas ("Divulgação resultado" e "Divulgação
 // Resultado"), herdadas de cargas diferentes. Unifica o rótulo na exibição.
 // `curto` é o que cabe na linha do card; o rótulo inteiro vai no title= da linha.
-// As duas últimas entraram numa carga de 24/07/2026 e trazem o horário da divulgação —
-// são "divulgação de resultado" com a informação extra de antes/depois do pregão.
 const EVENTOS = [
   { prefixo: 'divulgacao resultado', label: 'Divulgação de resultado', curto: 'Divulg.' },
   { prefixo: 'conferencia resultado', label: 'Conferência de resultado', curto: 'Call' },
   { prefixo: 'dia do investidor', label: 'Dia do investidor', curto: 'Inv. Day' },
-  { prefixo: 'resultado - apos o fechamento', label: 'Resultado — após o fechamento', curto: 'Após fech.' },
-  { prefixo: 'resultado - antes da abertura', label: 'Resultado — antes da abertura', curto: 'Antes abert.' },
+];
+
+// O ETL reescreveu esse campo quatro vezes só em 24/07/2026, e as duas últimas versões
+// usam "Resultado - <horário>". Em vez de mapear cada redação nova, o sufixo é abreviado
+// por regra; o que não casar aparece com o texto cru do banco, sem quebrar a linha.
+const HORARIOS = [
+  { chave: 'pos-mercado', curto: 'Pós-mkt' },
+  { chave: 'apos o fechamento', curto: 'Pós-mkt' },
+  { chave: 'pre-mercado', curto: 'Pré-mkt' },
+  { chave: 'antes da abertura', curto: 'Pré-mkt' },
+  { chave: 'horario a confirmar', curto: 'A confirmar' },
 ];
 
 function rotuloEvento(tipo) {
   const bruto = String(tipo || '').trim();
   const chave = normalizeText(bruto);
   const achado = EVENTOS.find((e) => chave.startsWith(e.prefixo));
-  return achado || { label: bruto, curto: bruto };
+  if (achado) return achado;
+  const comHorario = chave.match(/^resultado\s*[-–]\s*(.+)$/);
+  if (comHorario) {
+    const horario = HORARIOS.find((h) => comHorario[1].startsWith(h.chave));
+    if (horario) return { label: bruto, curto: horario.curto };
+  }
+  return { label: bruto, curto: bruto };
 }
 
 // Papel exibido: de preferência o que o painel já acompanha nos cards de setor, para o
@@ -1234,19 +1247,22 @@ async function carregaAgendaEmpresas() {
     papeisPorCvm.get(p.cd_cvm).push(p);
   }
   const lista = eventos.map((ev) => {
-    const papel = escolhePapel(papeisPorCvm.get(ev.cd_cvm) || []);
+    // Só entram empresas que o painel acompanha nos cards de setor. Isso também
+    // resolve os cd_cvm que nem existem em ac_ticker (emissores de dívida, companhias
+    // fechadas), que antes viravam linhas sem ticker nem nome.
+    const doPainel = (papeisPorCvm.get(ev.cd_cvm) || [])
+      .filter((p) => TICKERS_DO_PAINEL.has(p.ticker));
+    if (!doPainel.length) return null;
+    const papel = escolhePapel(doPainel);
     const rotulo = rotuloEvento(ev.tipo_evento);
     return {
       date: ev.dt_evento, // YYYY-MM-DD
-      ticker: papel?.ticker || null,
+      ticker: papel.ticker,
       empresa: nomeCurtoLimpo(papel, nomePorCvm.get(ev.cd_cvm)),
       evento: rotulo.label,
       eventoCurto: rotulo.curto,
     };
-  // Parte dos cd_cvm da tabela não existe em ac_empresa nem em ac_ticker (emissores de
-  // dívida, companhias fechadas). Sem ticker e sem nome a linha não identifica ninguém
-  // — viraria "CVM 19968" em branco —, então fica de fora.
-  }).filter((ev) => ev.ticker || ev.empresa);
+  }).filter(Boolean);
   // data mais próxima no topo; no mesmo dia, agrupa por evento e depois por ticker
   lista.sort((a, b) => a.date.localeCompare(b.date)
     || a.evento.localeCompare(b.evento)
