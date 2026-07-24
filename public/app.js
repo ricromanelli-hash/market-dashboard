@@ -500,6 +500,45 @@ function renderCalendarCard(calendar, limit) {
     </section>`;
 }
 
+// Único card cujo conteúdo vem de um banco (e não de uma lista fixa no código),
+// então o texto é escapado antes de entrar no HTML.
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => (
+  { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]
+));
+
+// Eventos das empresas (divulgação/conferência de resultado, dia do investidor) dos
+// próximos 7 dias contando hoje — a data mais próxima fica no topo.
+function renderAgendaEmpresasCard(agenda) {
+  const eventos = agenda?.eventos || [];
+  let body;
+  if (agenda?.unavailable) {
+    body = `<p class="row-unavailable" style="padding:12px">${esc(agenda.reason || 'indisponível')}</p>`;
+  } else if (!eventos.length) {
+    body = '<p class="row-unavailable" style="padding:12px">sem eventos nos próximos 7 dias</p>';
+  } else {
+    body = eventos.map((ev) => {
+      const [y, m, d] = String(ev.date).split('-').map(Number);
+      const dt = new Date(y, m - 1, d);
+      return `
+      <div class="row">
+        <div class="row-label">
+          <span class="row-name">${esc(ev.ticker)}</span>
+          <span class="row-symbol">${esc(ev.empresa)}</span>
+        </div>
+        <div class="ev-info">
+          <span class="ev-tipo">${esc(ev.evento)}</span>
+          <span class="cal-date">${dayFmt.format(dt)}</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  return `
+    <section class="card">
+      <div class="card-header">Agenda das Empresas (7 dias)</div>
+      <div class="card-body">${body}</div>
+    </section>`;
+}
+
 // Widget oficial do Investing.com (calendário econômico global). Montado UMA ÚNICA vez
 // num contêiner fora do #grid, que não é reconstruído a cada refresh de 30s — assim o
 // iframe não recarrega nem perde a data navegada pelo usuário.
@@ -565,6 +604,7 @@ function cardBuilders(data) {
     'IndicesMundiais': () => renderWorldIndicesCard(data.worldIndices),
     'JurosReais': () => renderRealRatesCard(data.realRates),
     'AgendaIBGE': () => renderCalendarCard(data.calendar, TV_MODE ? TV_AGENDA_LIMIT : undefined),
+    'AgendaEmpresas': () => renderAgendaEmpresasCard(data.agendaEmpresas),
     'CalendarioEconomico': () => '<div id="calSlot" class="cal-slot"></div>',
     'NoticiasMacro': () => renderNewsCard(data.macroNews, 'Notícias — Indicadores Macro', newsLimit),
     'NoticiasEmpresas': () => renderMainNewsCard(data, TV_MODE ? TV_MAIN_NEWS_LIMIT : undefined),
@@ -582,7 +622,7 @@ const TV_LAYOUT = [
   // "Destaques" entra no fim da coluna 1, que tinha ~460px livres — nada acima se move
   ['Estados Unidos', 'Brasil', 'Destaques', 'FearGreed'],
   ['Commodities', 'IndicesMundiais', 'JurosReais'],
-  ['Bancos', 'Energia', 'Seguros', 'Saneamento', 'Telecom', 'Petróleo & Gás'],
+  ['Bancos', 'Energia', 'Seguros', 'Saneamento', 'Telecom', 'Petróleo & Gás', 'AgendaEmpresas'],
   ['Mineração', 'Papel & Celulose', 'Metalurgia & Siderurgia', 'Químicos & Petroquímicos', 'Outros', 'MAG7 (S&P 500)'],
   ['AgendaIBGE', 'CalendarioEconomico', 'NoticiasMacro', 'NoticiasEmpresas'],
 ];

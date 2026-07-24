@@ -546,6 +546,23 @@ body.tv-mode .row-values { grid-template-columns: 78px 76px; gap: 10px; }
 .row-change.down { color: var(--red-down); }
 .row-change.flat { color: var(--gray-flat); }
 
+/* coluna direita da Agenda das Empresas: tipo do evento acima da data */
+.ev-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  min-width: 0;
+}
+
+.ev-tipo {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+body.tv-mode .ev-tipo { font-size: 11px; }
+
 .row-unavailable {
   font-size: 12px;
   color: var(--text-muted);

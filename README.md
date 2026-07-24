@@ -17,16 +17,26 @@ npm start
 
 Depois abra http://localhost:3000 no navegador.
 
-### Variável de ambiente (opcional)
+### Variáveis de ambiente (opcionais)
 
-`ALPHAVANTAGE_KEY` — chave do [Alpha Vantage](https://www.alphavantage.co/), usada só
-para a taxa de desemprego dos EUA na tabela de Juros Reais. **Nunca coloque a chave no
-código**: o repositório é público. Sem ela, a coluna simplesmente fica vazia.
+**Nunca coloque chaves no código**: o repositório é público. Configure-as assim:
 
-- Local: `$env:ALPHAVANTAGE_KEY = "sua-chave"` antes de `npm start`
+- Local: `$env:NOME = "valor"` antes de `npm start`
 - Render: *Dashboard → seu serviço → Environment → Add Environment Variable*
 
-O plano gratuito permite 25 requisições/dia, por isso o valor é cacheado por 12 horas.
+`ALPHAVANTAGE_KEY` — chave do [Alpha Vantage](https://www.alphavantage.co/), usada só
+para a taxa de desemprego dos EUA na tabela de Juros Reais. Sem ela, a coluna fica
+vazia. O plano gratuito permite 25 requisições/dia, por isso o valor é cacheado por
+12 horas.
+
+`SUPABASE_URL` e `SUPABASE_SERVICE_KEY` — projeto Supabase que alimenta o card
+**Agenda das Empresas**. Sem elas o card só avisa que falta configurar; o resto do
+painel não é afetado.
+
+> A `service_role` é obrigatória aqui: `ac_empresa_eventos`, `ac_empresa` e `ac_ticker`
+> têm RLS liberada apenas para o role `authenticated` (`private.is_userapp_or_admin()`),
+> então a chave `anon` não lê nada. Ela fica só no servidor — o navegador recebe apenas
+> o resultado já pronto em `/api/data`, nunca a chave.
 
 ## Publicar na nuvem (Render — grátis)
 
@@ -68,6 +78,23 @@ Passo a passo:
 | DI futuro (Jan/27…Jan/31) | Ferramenta de Juros Futuros do InfoMoney (`admin-ajax.php`) | Contratos `DI1F<ano>`; usa o nonce da página, renovado se expirar |
 | Notícias (geral, macro e por empresa) | RSS do InfoMoney e do Money Times | Feed geral + editorias de economia/inflação/Copom; filtro por empresa via ticker/nome |
 | Calendário Econômico | Widget oficial do Investing.com (iframe, roda no navegador) + Agenda IBGE (API pública) | O IBGE dá as datas de divulgação (IPCA, PIB, PNAD, PMC, PMS, etc.) |
+| Agenda das Empresas | Supabase — `ac_empresa_eventos`, com nome e papel de `ac_empresa` e `ac_ticker` | Exige `SUPABASE_URL` + `SUPABASE_SERVICE_KEY` (ver acima) |
+
+### Agenda das Empresas
+
+Card abaixo de *Petróleo & Gás*: divulgação de resultado, conferência de resultado e dia
+do investidor dos **próximos 7 dias contando o de hoje**, com a data mais próxima no topo.
+
+Três detalhes da leitura (`refreshAgendaEmpresas` em [server.js](server.js)):
+
+- **Sem join no PostgREST.** Não existe foreign key ligando `ac_empresa_eventos` a
+  `ac_empresa`/`ac_ticker`, então são três consultas e o cruzamento é feito em JS.
+- **Um papel por empresa.** Companhias com ON/PN/UNIT aparecem com o papel que o painel
+  já acompanha nos cards de setor; na falta dele, a ordem é ON, UNIT, PN. Papéis com
+  `ativo = 'N'` (ODPV3, CPLE5/6…) são descartados.
+- **Caixa do `tipo_evento` normalizada.** A tabela tem "Divulgação resultado" e
+  "Divulgação Resultado" como valores distintos — resquício de uma carga de 17/07/2025.
+  O rótulo é unificado na exibição; o banco não é alterado.
 
 ### Termômetro do Mercado
 

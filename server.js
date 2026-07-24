@@ -272,6 +272,7 @@ const cache = {
   realRates: [],
   fearGreed: null,
   sentimentoBr: null,
+  agendaEmpresas: { de: null, ate: null, eventos: [] },
   errors: [],
 };
 
@@ -1087,6 +1088,122 @@ async function refreshCalendar() {
   cache.calendar = events.slice(0, 12);
 }
 
+// ---- Agenda de eventos das empresas (Supabase) ----
+// Lê ac_empresa_eventos e completa nome e papel com ac_empresa e ac_ticker. Não dá para
+// pedir o join ao PostgREST porque não existe foreign key entre elas — daí as três
+// consultas separadas. As três tabelas têm RLS liberada só para o role `authenticated`
+// via is_userapp_or_admin(), então a chave anon não enxerga nada: é preciso a
+// service_role, que fica só no servidor e nunca chega ao navegador.
+const SUPABASE_URL = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || '';
+const AGENDA_DIAS = 7; // janela: hoje mais os 6 dias seguintes
+
+async function supabaseSelect(tabela, query) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${tabela}?${query}`, {
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      Accept: 'application/json',
+    },
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!res.ok) throw new Error(`Supabase ${tabela}: HTTP ${res.status}`);
+  return res.json();
+}
+
+// Data de hoje no fuso de São Paulo. O servidor no Render roda em UTC, e depois das 21h
+// de Brasília a janela pularia um dia se usássemos a data local da máquina.
+// 'sv-SE' é o truque de sempre: já formata como YYYY-MM-DD.
+function hojeSaoPaulo() {
+  return new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+}
+
+function somaDias(iso, dias) {
+  const d = new Date(`${iso}T12:00:00Z`); // meio-dia evita virar o dia no fuso
+  d.setUTCDate(d.getUTCDate() + dias);
+  return toIsoDay(d);
+}
+
+// A tabela guarda o mesmo evento em duas caixas ("Divulgação resultado" e "Divulgação
+// Resultado"), herdadas de cargas diferentes. Unifica o rótulo na exibição.
+function rotuloEvento(tipo) {
+  const bruto = String(tipo || '').trim();
+  const chave = normalizeText(bruto);
+  if (chave.startsWith('divulgacao resultado')) return 'Divulgação de resultado';
+  if (chave.startsWith('conferencia resultado')) return 'Conferência de resultado';
+  if (chave.startsWith('dia do investidor')) return 'Dia do investidor';
+  return bruto;
+}
+
+// Papel exibido: de preferência o que o painel já acompanha nos cards de setor, para o
+// ticker bater com o resto da tela; senão ON, depois UNIT, depois PN.
+const TICKERS_DO_PAINEL = new Set(FOLLOWED_COMPANIES.map((c) => c.ticker));
+const ORDEM_TIPO = { ON: 0, UNIT: 1, PN: 2 };
+
+function escolhePapel(papeis) {
+  const ativos = papeis.filter((p) => p.ativo !== 'N'); // ODPV3, CPLE5/6... saíram da B3
+  const lista = ativos.length ? ativos : papeis;
+  return lista.slice().sort((a, b) => {
+    const painel = Number(TICKERS_DO_PAINEL.has(b.ticker)) - Number(TICKERS_DO_PAINEL.has(a.ticker));
+    if (painel) return painel;
+    const tipo = (ORDEM_TIPO[a.tipo_ticker] ?? 9) - (ORDEM_TIPO[b.tipo_ticker] ?? 9);
+    if (tipo) return tipo;
+    return String(a.ticker).localeCompare(String(b.ticker));
+  })[0];
+}
+
+// "TAESA UNT" -> "TAESA". Sem nome_curto, cai no nome de mercado (bem mais longo).
+function nomeCurtoLimpo(papel, nomeMercado) {
+  const bruto = String(papel?.nome_curto || '').trim();
+  const limpo = bruto.replace(/\s+(ON|PN|PNA|PNB|PNC|UNT|UNIT)$/i, '').trim();
+  return limpo || String(nomeMercado || '').trim();
+}
+
+async function refreshAgendaEmpresas() {
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    cache.agendaEmpresas = {
+      unavailable: true,
+      reason: 'Defina SUPABASE_URL e SUPABASE_SERVICE_KEY para carregar a agenda',
+    };
+    return;
+  }
+  const de = hojeSaoPaulo();
+  const ate = somaDias(de, AGENDA_DIAS - 1);
+  const eventos = await supabaseSelect(
+    'ac_empresa_eventos',
+    `select=cd_cvm,dt_evento,tipo_evento&dt_evento=gte.${de}&dt_evento=lte.${ate}`,
+  );
+  if (!eventos.length) {
+    cache.agendaEmpresas = { de, ate, eventos: [] };
+    return;
+  }
+  const ids = [...new Set(eventos.map((e) => e.cd_cvm))].join(',');
+  const [empresas, papeis] = await Promise.all([
+    supabaseSelect('ac_empresa', `select=cd_cvm,nome_mercado&cd_cvm=in.(${ids})`),
+    supabaseSelect('ac_ticker', `select=cd_cvm,ticker,tipo_ticker,ativo,nome_curto&cd_cvm=in.(${ids})`),
+  ]);
+  const nomePorCvm = new Map(empresas.map((e) => [e.cd_cvm, e.nome_mercado]));
+  const papeisPorCvm = new Map();
+  for (const p of papeis) {
+    if (!papeisPorCvm.has(p.cd_cvm)) papeisPorCvm.set(p.cd_cvm, []);
+    papeisPorCvm.get(p.cd_cvm).push(p);
+  }
+  const lista = eventos.map((ev) => {
+    const papel = escolhePapel(papeisPorCvm.get(ev.cd_cvm) || []);
+    return {
+      date: ev.dt_evento, // YYYY-MM-DD
+      ticker: papel?.ticker || `CVM ${ev.cd_cvm}`,
+      empresa: nomeCurtoLimpo(papel, nomePorCvm.get(ev.cd_cvm)),
+      evento: rotuloEvento(ev.tipo_evento),
+    };
+  });
+  // data mais próxima no topo; no mesmo dia, agrupa por evento e depois por ticker
+  lista.sort((a, b) => a.date.localeCompare(b.date)
+    || a.evento.localeCompare(b.evento)
+    || a.ticker.localeCompare(b.ticker));
+  cache.agendaEmpresas = { de, ate, eventos: lista };
+}
+
 async function refreshSlowData() {
   // O CSV do Tesouro alimenta o IPCA+ 2032 e o 10 anos nominal do Brasil, que
   // refreshRealRates consome — por isso roda antes.
@@ -1111,6 +1228,7 @@ async function refreshSlowData() {
     refreshMacroNews(),
     refreshCompanyNews(),
     refreshCalendar(),
+    refreshAgendaEmpresas(),
   ]);
   cache.errors = [...tesouro, ...jobs].filter((r) => r.status === 'rejected').map((r) => r.reason.message);
   cache.slowUpdatedAt = new Date().toISOString();
