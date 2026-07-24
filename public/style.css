@@ -368,6 +368,27 @@ body.tv-mode .hl-value { font-size: 38px; }
 }
 body.tv-mode .row-note { font-size: 9.5px; }
 
+/* linha secundária de pré-abertura, logo abaixo da cotação regular */
+.row-pre {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 0;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #f0f2ef;
+}
+.pre-tag {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+}
+.row-pre .row-price { font-size: 12px; }
+.row-pre .row-change { font-size: 11px; }
+body.tv-mode .row-pre { padding-bottom: 2px; }
+body.tv-mode .pre-tag { font-size: 9px; }
+
 /* Hora local da bolsa, na própria linha do índice.
    verde = pregão aberto · laranja = perto do fechamento · cinza = fechado */
 .idx-hora {

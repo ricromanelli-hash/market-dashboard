@@ -22,7 +22,7 @@ const GROUPS = [
   { title: 'Brasil', items: [
     { symbol: '^BVSP', label: 'Ibovespa' },
     { symbol: 'BRL=X', label: 'Dólar', displaySymbol: 'USDBRL=X' },
-    { symbol: 'EWZ', label: 'EWZ (MSCI Brazil)' },
+    { symbol: 'EWZ', label: 'EWZ (MSCI Brazil)', prePost: true },
   ]},
   { title: 'Commodities', items: [
     { symbol: 'SB=F', label: 'Açúcar NY nº11' },
@@ -496,6 +496,51 @@ async function refreshHistory() {
   cache.sentimentoBr = calcSentimentoBr(seriesB3, ibov);
 }
 
+// Pré-abertura / after-market. O `meta` do Yahoo não traz o preço estendido pronto,
+// mas com includePrePost a série passa a conter os candles fora do pregão: o último
+// ponto posterior ao fechamento regular é a cotação estendida.
+async function fetchPrePost(symbol, precoRegular) {
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`
+      + '?interval=1m&range=1d&includePrePost=true';
+    const res = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(20000) });
+    if (!res.ok) return {};
+    const result = (await res.json())?.chart?.result?.[0];
+    const meta = result?.meta;
+    // Referência é o instante do último negócio regular — não o fim do pregão de hoje,
+    // que na pré-abertura ainda está no futuro (e filtraria todos os candles).
+    const fimRegular = meta?.regularMarketTime;
+    const stamps = result?.timestamp || [];
+    const closes = result?.indicators?.quote?.[0]?.close || [];
+    if (!fimRegular || stamps.length === 0) return {};
+
+    // último candle depois do encerramento do pregão regular
+    let preco = null;
+    let quando = null;
+    for (let i = stamps.length - 1; i >= 0; i--) {
+      if (stamps[i] > fimRegular && typeof closes[i] === 'number') {
+        preco = closes[i];
+        quando = stamps[i];
+        break;
+      }
+    }
+    const base = typeof precoRegular === 'number' ? precoRegular : meta.regularMarketPrice;
+    if (preco === null || !base) return {};
+    const d = new Date(quando * 1000);
+    const hora = new Intl.DateTimeFormat('pt-BR', {
+      timeZone: meta.exchangeTimezoneName || 'America/New_York',
+      hour: '2-digit', minute: '2-digit', hour12: false,
+    }).format(d);
+    return {
+      prePrice: +preco.toFixed(2),
+      prePct: +(((preco - base) / base) * 100).toFixed(2),
+      preHora: hora,
+    };
+  } catch {
+    return {}; // sem pré-abertura o card segue normal
+  }
+}
+
 async function mapWithConcurrency(items, limit, fn) {
   const results = new Array(items.length);
   let idx = 0;
@@ -517,6 +562,7 @@ async function refreshMarketData() {
   for (const group of GROUPS) {
     const results = await mapWithConcurrency(group.items, 6, async (item) => {
       const quote = await fetchQuote(item.symbol, item.fromSeries);
+      if (item.prePost) Object.assign(quote, await fetchPrePost(item.symbol, quote.price));
       // variação de 12 meses: preço atual contra o fechamento de ~1 ano atrás
       const base = historyBase.get(item.symbol);
       const chg12m = (base && typeof quote.price === 'number')

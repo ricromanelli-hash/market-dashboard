@@ -76,6 +76,17 @@ function renderQuoteRow(item) {
       </div>`;
   }
 
+  // pré-abertura / after-market, quando disponível (ex.: EWZ)
+  const pre = typeof item.prePrice === 'number'
+    ? `<div class="row row-pre">
+         <span class="pre-tag">pré-abertura ${item.preHora || ''}</span>
+         <span class="row-values">
+           <span class="row-price">${formatPrice(item.prePrice, item.currency)}</span>
+           <span class="row-change ${item.prePct >= 0 ? 'up' : 'down'}">${item.prePct >= 0 ? '↗ +' : '↘ '}${item.prePct.toFixed(2)}%</span>
+         </span>
+       </div>`
+    : '';
+
   return `
     <div class="row">
       ${nome}
@@ -83,7 +94,7 @@ function renderQuoteRow(item) {
         ${preco}
         ${variacao}
       </div>
-    </div>`;
+    </div>${pre}`;
 }
 
 function renderRateRow(rate) {
