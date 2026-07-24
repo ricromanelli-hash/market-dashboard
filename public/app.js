@@ -52,8 +52,10 @@ function renderQuoteRow(item) {
   const trend = item.spark && item.spark.length > 1
     ? `<span class="row-spark" title="tendência de 12 meses">${sparkline(item.spark, item.spark[item.spark.length - 1] >= item.spark[0])}</span>`
     : '';
+  // selo das sete originais: o card MAG7 hoje lista também SAP, Oracle e as de chips
+  const selo = item.mag7 ? '<span class="row-mag7" title="Magnificent Seven">M7</span>' : '';
   const nome = `<div class="row-label">
-        <span class="row-name">${item.label}${item.refDate ? `<span class="row-note" title="não é preço intradiário: último fechamento disponível">fech. ${item.refDate}</span>` : ''}</span>
+        <span class="row-name">${item.label}${selo}${item.refDate ? `<span class="row-note" title="não é preço intradiário: último fechamento disponível">fech. ${item.refDate}</span>` : ''}</span>
         <span class="row-symbol">${item.displaySymbol || item.symbol}</span>
       </div>`;
   const preco = `<span class="row-price">${formatPrice(item.price, item.currency)}</span>`;

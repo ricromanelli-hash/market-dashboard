@@ -112,16 +112,21 @@ const GROUPS = [
   ]},
   // "Magnificent 7" do S&P 500. `icon` habilita o logo (o serviço da brapi só tem
   // algumas destas; as demais ficam com o espaço reservado em branco).
+  // O card já passou a comportar outras big techs além das sete originais, por isso
+  // `mag7: true` marca quem é de fato Magnificent Seven — vira o selo "M7" na linha.
   { title: 'MAG7 (S&P 500)', items: [
-    { symbol: 'GOOGL', label: 'Alphabet', icon: 'GOOGL' },
-    { symbol: 'AMZN', label: 'Amazon', icon: 'AMZN' },
-    { symbol: 'AAPL', label: 'Apple', icon: 'AAPL' },
-    { symbol: 'META', label: 'Meta', icon: 'META' },
-    { symbol: 'MSFT', label: 'Microsoft', icon: 'MSFT' },
-    { symbol: 'NVDA', label: 'Nvidia', icon: 'NVDA' },
-    { symbol: 'TSLA', label: 'Tesla', icon: 'TSLA' },
+    { symbol: 'GOOGL', label: 'Alphabet', icon: 'GOOGL', mag7: true },
+    { symbol: 'AMZN', label: 'Amazon', icon: 'AMZN', mag7: true },
+    { symbol: 'AAPL', label: 'Apple', icon: 'AAPL', mag7: true },
+    { symbol: 'META', label: 'Meta', icon: 'META', mag7: true },
+    { symbol: 'MSFT', label: 'Microsoft', icon: 'MSFT', mag7: true },
+    { symbol: 'NVDA', label: 'Nvidia', icon: 'NVDA', mag7: true },
+    { symbol: 'TSLA', label: 'Tesla', icon: 'TSLA', mag7: true },
     { symbol: 'SAP', label: 'SAP', icon: 'SAP' },
     { symbol: 'ORCL', label: 'Oracle', icon: 'ORCL' },
+    { symbol: 'MU', label: 'Micron', icon: 'MU' },
+    { symbol: 'AVGO', label: 'Broadcom', icon: 'AVGO' },
+    { symbol: 'AMD', label: 'AMD', icon: 'AMD' },
   ]},
 ];
 
