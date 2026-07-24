@@ -143,7 +143,8 @@ function sparkline(values, up) {
   </svg>`;
 }
 
-const idxFmt = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// Sem centavos: índice é número grande e as duas casas só roubavam largura da coluna.
+const idxFmt = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
 
 function renderWorldIndicesCard(regions) {
   if (!regions || regions.length === 0) {
