@@ -515,12 +515,17 @@ body.tv-mode .row-spark svg { width: 22px; }
   color: var(--symbol-color);
 }
 
+/* Colunas fixas para valor e variação: com larguras automáticas cada linha se
+   dimensionava pelo próprio conteúdo e as colunas não batiam entre si. */
 .row-values {
-  display: flex;
+  display: grid;
+  grid-template-columns: 76px 56px;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   white-space: nowrap;
 }
+.row-values > .row-price { text-align: right; }
+.row-values > .row-change { justify-content: flex-end; }
 
 .row-price { font-weight: 600; }
 
