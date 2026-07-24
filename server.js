@@ -1091,11 +1091,13 @@ async function refreshCalendar() {
 // ---- Agenda de eventos das empresas (Supabase) ----
 // Lê ac_empresa_eventos e completa nome e papel com ac_empresa e ac_ticker. Não dá para
 // pedir o join ao PostgREST porque não existe foreign key entre elas — daí as três
-// consultas separadas. As três tabelas têm RLS liberada só para o role `authenticated`
-// via is_userapp_or_admin(), então a chave anon não enxerga nada: é preciso a
-// service_role, que fica só no servidor e nunca chega ao navegador.
+// consultas separadas. Basta a chave anon, desde que as três tabelas tenham uma policy
+// de SELECT para o role `anon` (por padrão a RLS delas só libera `authenticated`).
 const SUPABASE_URL = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || '';
+const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY
+  || process.env.SUPABASE_KEY
+  || process.env.SUPABASE_SERVICE_KEY
+  || '';
 const AGENDA_DIAS = 7; // janela: hoje mais os 6 dias seguintes
 
 async function supabaseSelect(tabela, query) {
@@ -1163,7 +1165,7 @@ async function refreshAgendaEmpresas() {
   if (!SUPABASE_URL || !SUPABASE_KEY) {
     cache.agendaEmpresas = {
       unavailable: true,
-      reason: 'Defina SUPABASE_URL e SUPABASE_SERVICE_KEY para carregar a agenda',
+      reason: 'Defina SUPABASE_URL e SUPABASE_ANON_KEY para carregar a agenda',
     };
     return;
   }

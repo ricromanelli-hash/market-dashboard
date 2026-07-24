@@ -29,14 +29,15 @@ para a taxa de desemprego dos EUA na tabela de Juros Reais. Sem ela, a coluna fi
 vazia. O plano gratuito permite 25 requisições/dia, por isso o valor é cacheado por
 12 horas.
 
-`SUPABASE_URL` e `SUPABASE_SERVICE_KEY` — projeto Supabase que alimenta o card
+`SUPABASE_URL` e `SUPABASE_ANON_KEY` — projeto Supabase que alimenta o card
 **Agenda das Empresas**. Sem elas o card só avisa que falta configurar; o resto do
 painel não é afetado.
 
-> A `service_role` é obrigatória aqui: `ac_empresa_eventos`, `ac_empresa` e `ac_ticker`
-> têm RLS liberada apenas para o role `authenticated` (`private.is_userapp_or_admin()`),
-> então a chave `anon` não lê nada. Ela fica só no servidor — o navegador recebe apenas
-> o resultado já pronto em `/api/data`, nunca a chave.
+> A chave `anon` só funciona se as **três** tabelas lidas — `ac_empresa_eventos`,
+> `ac_empresa` e `ac_ticker` — tiverem uma policy de `SELECT` para o role `anon`. Por
+> padrão a RLS delas libera apenas `authenticated`, via `private.is_userapp_or_admin()`.
+> Se preferir não expor as tabelas inteiras, aceita também uma `service_role` em
+> `SUPABASE_SERVICE_KEY` (nesse caso nenhuma policy é necessária).
 
 ## Publicar na nuvem (Render — grátis)
 
@@ -78,7 +79,7 @@ Passo a passo:
 | DI futuro (Jan/27…Jan/31) | Ferramenta de Juros Futuros do InfoMoney (`admin-ajax.php`) | Contratos `DI1F<ano>`; usa o nonce da página, renovado se expirar |
 | Notícias (geral, macro e por empresa) | RSS do InfoMoney e do Money Times | Feed geral + editorias de economia/inflação/Copom; filtro por empresa via ticker/nome |
 | Calendário Econômico | Widget oficial do Investing.com (iframe, roda no navegador) + Agenda IBGE (API pública) | O IBGE dá as datas de divulgação (IPCA, PIB, PNAD, PMC, PMS, etc.) |
-| Agenda das Empresas | Supabase — `ac_empresa_eventos`, com nome e papel de `ac_empresa` e `ac_ticker` | Exige `SUPABASE_URL` + `SUPABASE_SERVICE_KEY` (ver acima) |
+| Agenda das Empresas | Supabase — `ac_empresa_eventos`, com nome e papel de `ac_empresa` e `ac_ticker` | Exige `SUPABASE_URL` + `SUPABASE_ANON_KEY` (ver acima) |
 
 ### Agenda das Empresas
 
