@@ -1098,6 +1098,7 @@ const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY
   || process.env.SUPABASE_SERVICE_KEY
   || '';
 const AGENDA_DIAS = 7; // janela: hoje mais os 6 dias seguintes
+const AGENDA_REFRESH_MS = 5 * 60 * 1000;
 
 async function supabaseSelect(tabela, query) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${tabela}?${query}`, {
@@ -1269,7 +1270,6 @@ async function refreshSlowData() {
     refreshMacroNews(),
     refreshCompanyNews(),
     refreshCalendar(),
-    refreshAgendaEmpresas(),
   ]);
   cache.errors = [...tesouro, ...jobs].filter((r) => r.status === 'rejected').map((r) => r.reason.message);
   cache.slowUpdatedAt = new Date().toISOString();
@@ -1284,11 +1284,18 @@ app.get('/api/data', (req, res) => {
 
 app.listen(PORT, async () => {
   console.log(`Market dashboard rodando em http://localhost:${PORT}`);
-  await Promise.allSettled([refreshMarketData(), refreshSlowData()]);
+  await Promise.allSettled([refreshMarketData(), refreshSlowData(), refreshAgendaEmpresas()]);
   setInterval(() => {
     refreshMarketData().catch((err) => console.error('Erro ao atualizar cotações:', err.message));
   }, 30_000);
   setInterval(() => {
     refreshSlowData().catch((err) => console.error('Erro ao atualizar dados lentos:', err.message));
   }, 30 * 60 * 1000);
+  // A agenda tem ciclo próprio, bem mais curto que o dos dados lentos: o ETL reescreve
+  // a ac_empresa_eventos várias vezes ao dia (apaga e recarrega), e com 30 minutos o
+  // painel ficava até meia hora exibindo um retrato vencido — ou vazio, se a consulta
+  // caísse no intervalo entre o delete e o insert. São 3 requisições por ciclo.
+  setInterval(() => {
+    refreshAgendaEmpresas().catch((err) => console.error('Erro ao atualizar a agenda:', err.message));
+  }, AGENDA_REFRESH_MS);
 });
