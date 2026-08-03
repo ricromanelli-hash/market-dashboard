@@ -348,12 +348,33 @@ async function fetchQuote(symbol, fromSeries = false) {
     throw new Error(`Yahoo ${symbol}: sem preço`);
   }
   const price = meta.regularMarketPrice;
-  // meta.chartPreviousClose NÃO é o fechamento da sessão anterior — é o fechamento
-  // anterior ao início da janela "range" pedida (aqui, 5 dias atrás), então fica
-  // desatualizado e distorce o %. A penúltima barra da série diária é o fechamento
-  // real da sessão anterior (a última barra é a sessão corrente/hoje).
-  const closes = (result?.indicators?.quote?.[0]?.close || []).filter((c) => typeof c === 'number');
-  const prevClose = closes.length >= 2 ? closes[closes.length - 2] : meta.previousClose;
+  // Fechamento da sessão anterior = a última barra diária ANTERIOR à sessão de hoje.
+  // Não dá para pegar simplesmente a penúltima barra (closes[-2]): na pré-abertura, ou
+  // quando a série do Yahoo ainda não materializou a barra de hoje, a última barra passa
+  // a ser a de ontem e a penúltima a de anteontem — o % então compara com anteontem e
+  // dispara (o SANB11 já apareceu com +14,7% em vez de +1,2% depois de saltar 13% num
+  // dia). meta.chartPreviousClose também não serve: é o fechamento anterior ao início da
+  // janela pedida (~10 dias atrás), não o de ontem.
+  const stamps = result?.timestamp || [];
+  const closeArr = result?.indicators?.quote?.[0]?.close || [];
+  const bars = [];
+  for (let i = 0; i < closeArr.length; i++) {
+    if (typeof closeArr[i] === 'number' && stamps[i]) bars.push({ ts: stamps[i], close: closeArr[i] });
+  }
+  // dia (UTC) de cada barra: os pregões de B3/EUA acontecem toda a sessão no mesmo dia
+  // UTC do timestamp, então a data UTC serve de chave de sessão sem depender de fuso.
+  const diaUTC = (ts) => new Date(ts * 1000).toISOString().slice(0, 10);
+  const ultimaBarraTs = bars.length ? bars[bars.length - 1].ts : 0;
+  // sessão atual = a mais recente entre o último negócio e a última barra (cobre o caso
+  // de a série estar adiantada ou atrasada em relação ao preço ao vivo).
+  const sessaoAtual = diaUTC(Math.max(meta.regularMarketTime || 0, ultimaBarraTs));
+  let prevClose = null;
+  for (let i = bars.length - 1; i >= 0; i--) {
+    if (diaUTC(bars[i].ts) < sessaoAtual) { prevClose = bars[i].close; break; }
+  }
+  if (prevClose == null) {
+    prevClose = meta.previousClose ?? (bars.length >= 2 ? bars[bars.length - 2].close : null);
+  }
   const changePct = prevClose ? ((price - prevClose) / prevClose) * 100 : 0;
   return { price, changePct, currency: meta.currency ?? null };
 }
