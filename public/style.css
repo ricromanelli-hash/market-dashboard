@@ -758,7 +758,7 @@ body.tv-mode .rr-row {
   gap: 3px;
 }
 body.tv-mode .rr-head { font-size: 9.5px; }
-body.tv-mode .tv-col > * { margin-bottom: 10px; }
+body.tv-mode .tv-col > * { margin-bottom: 5px; }
 body.tv-mode .tv-col > *:last-child { margin-bottom: 0; }
 
 /* índices mundiais compactos na TV: valor e % na mesma linha do nome */
@@ -784,7 +784,7 @@ body.tv-mode .cal-slot { margin: 0; }
 
 body.tv-mode .card {
   break-inside: avoid;
-  margin: 0 0 10px;
+  margin: 0 0 5px;
   border-color: #24352e;
 }
 
