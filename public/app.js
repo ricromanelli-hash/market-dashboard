@@ -763,10 +763,11 @@ function fitStage() {
   const stage = document.getElementById('stage');
   if (!stage) return;
   const scale = Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H);
-  // centraliza o palco escalado
+  // centraliza na horizontal, mas encosta no topo: quando a janela é mais "quadrada"
+  // que 16:9, a sobra vertical iria toda para uma faixa acima e outra abaixo — aqui
+  // ela fica só embaixo, e o painel começa colado no topo do navegador.
   const left = (window.innerWidth - STAGE_W * scale) / 2;
-  const top = (window.innerHeight - STAGE_H * scale) / 2;
-  stage.style.transform = `translate(${left}px, ${top}px) scale(${scale})`;
+  stage.style.transform = `translate(${left}px, 0px) scale(${scale})`;
   if (TV_MODE) positionCalWidget();
 }
 
