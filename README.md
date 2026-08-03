@@ -103,6 +103,13 @@ Três detalhes da leitura (`refreshAgendaEmpresas` em [server.js](server.js)):
   `ac_ticker` — emissores de dívida e companhias fechadas, que não identificariam ninguém.
   Para ver uma empresa nova na agenda, basta incluir o ticker dela em `GROUPS`.
 
+### Maiores Altas e Baixas · B3
+
+Card abaixo do Termômetro: as cinco maiores altas e as cinco maiores baixas do dia entre
+as ações da B3 que o painel já acompanha nos cards de setor (apenas os `symbol` terminando
+em `.SA`). Não faz busca nova — reaproveita o `changePct` que os cards já trazem, então é
+de graça. Empresas com variação zero ou sem cotação não entram em nenhuma das colunas.
+
 ### Termômetro do Mercado
 
 Dois medidores lado a lado:

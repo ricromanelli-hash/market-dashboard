@@ -455,6 +455,41 @@ body.tv-mode .fng-titulo { font-size: 10px; }
 body.tv-mode .fng-rotulo { font-size: 10px; }
 body.tv-mode .fng-hist { font-size: 9.5px; }
 
+/* Maiores Altas e Baixas: duas colunas lado a lado (logo · ticker · %). */
+.mv-body { display: flex; padding: 0; }
+.mv-col { flex: 1 1 0; min-width: 0; }
+.mv-col + .mv-col { border-left: 1px solid var(--border); }
+
+.mv-subhead {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+  color: var(--text-muted);
+  padding: 6px 10px 4px;
+  border-bottom: 1px solid #f0f2ef;
+}
+
+.mv-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-bottom: 1px solid #f0f2ef;
+}
+.mv-row:last-child { border-bottom: none; }
+
+.mv-tk { font-size: 12px; font-weight: 600; }
+.mv-pct { font-size: 11px; font-weight: 600; white-space: nowrap; text-align: right; }
+.mv-pct.up { color: var(--green-up); }
+.mv-pct.down { color: var(--red-down); }
+.mv-pct.flat { color: var(--gray-flat); }
+
+body.tv-mode .mv-subhead { font-size: 11px; }
+body.tv-mode .mv-tk { font-size: 13px; }
+body.tv-mode .mv-pct { font-size: 12px; }
+
 /* Linhas de ações em grid: com flex cada linha se dimensionava pelo próprio conteúdo
    e as colunas ficavam desalinhadas entre si. Larguras fixas resolvem. */
 .row-stock {

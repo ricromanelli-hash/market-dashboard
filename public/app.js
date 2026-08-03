@@ -270,6 +270,56 @@ function renderSentimentoCard(fg, br) {
     </section>`;
 }
 
+// Maiores altas e baixas do dia entre as ações da B3 que o painel já acompanha (só as
+// dos cards de setor: symbol terminando em .SA, com variação numérica). Não faz nenhuma
+// busca nova — reaproveita o changePct que os cards já trazem.
+const MOVERS_N = 5;
+
+function renderMoversCard(data) {
+  const g = data.groups || {};
+  const vistos = new Set();
+  const acoes = [];
+  for (const items of Object.values(g)) {
+    for (const it of items || []) {
+      if (!it.symbol?.endsWith('.SA')) continue;
+      if (it.error || typeof it.changePct !== 'number') continue;
+      if (vistos.has(it.symbol)) continue; // dedupe defensivo
+      vistos.add(it.symbol);
+      acoes.push(it);
+    }
+  }
+  const altas = acoes.filter((a) => a.changePct > 0)
+    .sort((a, b) => b.changePct - a.changePct).slice(0, MOVERS_N);
+  const baixas = acoes.filter((a) => a.changePct < 0)
+    .sort((a, b) => a.changePct - b.changePct).slice(0, MOVERS_N);
+
+  const linha = (it) => {
+    const { cls, icon } = changeIcon(it.changePct);
+    const ticker = it.symbol.replace('.SA', '');
+    const pct = `${it.changePct >= 0 ? '+' : ''}${it.changePct.toFixed(1).replace('.', ',')}%`;
+    return `
+      <div class="mv-row" title="${esc(it.label || ticker)}">
+        ${logoImg(it.symbol)}
+        <span class="mv-tk">${esc(ticker)}</span>
+        <span class="mv-pct ${cls}">${icon} ${pct}</span>
+      </div>`;
+  };
+  const coluna = (titulo, lista) => {
+    const corpo = lista.length
+      ? lista.map(linha).join('')
+      : '<p class="row-unavailable" style="padding:8px 10px">—</p>';
+    return `<div class="mv-col"><div class="mv-subhead">${titulo}</div>${corpo}</div>`;
+  };
+  return `
+    <section class="card">
+      <div class="card-header">Maiores Altas e Baixas · B3</div>
+      <div class="card-body mv-body">
+        ${coluna('Maiores Altas', altas)}
+        ${coluna('Maiores Baixas', baixas)}
+      </div>
+    </section>`;
+}
+
 // ---- Relógio das principais bolsas ----
 // Horários de pregão regular, em hora local de cada praça. Os fusos (e o horário de
 // verão) são resolvidos pelo próprio navegador via Intl — sem API externa.
@@ -625,6 +675,7 @@ function cardBuilders(data) {
   const builders = {
     'Destaques': () => renderHighlightsCard(data),
     'FearGreed': () => renderSentimentoCard(data.fearGreed, data.sentimentoBr),
+    'Movers': () => renderMoversCard(data),
     'Estados Unidos': () => renderGroupCard('Estados Unidos', g['Estados Unidos'], renderCpiRow(data.cpi)),
     'Brasil': () => renderGroupCard('Brasil', g['Brasil'], renderBrasilRatesRows(data.brasilRates)),
     'IndicesMundiais': () => renderWorldIndicesCard(data.worldIndices),
@@ -646,7 +697,7 @@ function cardBuilders(data) {
 // A última coluna é mais larga para acomodar o calendário do Investing.
 const TV_LAYOUT = [
   // "Destaques" entra no fim da coluna 1, que tinha ~460px livres — nada acima se move
-  ['Estados Unidos', 'Brasil', 'Destaques', 'FearGreed'],
+  ['Estados Unidos', 'Brasil', 'Destaques', 'FearGreed', 'Movers'],
   ['Commodities', 'IndicesMundiais', 'JurosReais'],
   ['Bancos', 'Energia', 'Seguros', 'Saneamento', 'Telecom', 'Petróleo & Gás', 'AgendaEmpresas'],
   ['Mineração', 'Papel & Celulose', 'Metalurgia & Siderurgia', 'Químicos & Petroquímicos', 'Outros', 'MAG7 (S&P 500)'],
