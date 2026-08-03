@@ -304,18 +304,20 @@ function renderMoversCard(data) {
         <span class="mv-pct ${cls}">${icon} ${pct}</span>
       </div>`;
   };
-  const coluna = (titulo, lista) => {
+  // Sem subtítulo: a cor (verde/vermelho) e a seta já separam altas de baixas, e a
+  // linha economizada deixa caber os 5 tickers de cada lado na altura do card.
+  const coluna = (lista) => {
     const corpo = lista.length
       ? lista.map(linha).join('')
       : '<p class="row-unavailable" style="padding:8px 10px">—</p>';
-    return `<div class="mv-col"><div class="mv-subhead">${titulo}</div>${corpo}</div>`;
+    return `<div class="mv-col">${corpo}</div>`;
   };
   return `
     <section class="card">
       <div class="card-header">Maiores Altas e Baixas · B3</div>
       <div class="card-body mv-body">
-        ${coluna('Maiores Altas', altas)}
-        ${coluna('Maiores Baixas', baixas)}
+        ${coluna(altas)}
+        ${coluna(baixas)}
       </div>
     </section>`;
 }
