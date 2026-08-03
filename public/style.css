@@ -718,7 +718,7 @@ body.tv-mode .topbar {
   align-items: baseline;
   gap: 14px;
 }
-body.tv-mode .topbar h1 { font-size: 19px; color: #eafff5; margin: 0; }
+body.tv-mode .topbar h1 { display: none; } /* na TV o título não agrega — libera o rodapé */
 /* a lista de fontes não agrega numa TV e custa uma linha do topo */
 body.tv-mode .subtitle { display: none; }
 body.tv-mode .updated-at { font-size: 12px; color: #cfe; }
