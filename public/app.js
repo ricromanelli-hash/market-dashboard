@@ -511,45 +511,57 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]
 ));
 
-// "seg., 27/07" — versão curta de dayFmt, para a linha caber inteira na coluna.
-const diaMesFmt = new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' });
+const agDiaMesFmt = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit' }); // "03/08"
+const agDowFmt = new Intl.DateTimeFormat('pt-BR', { weekday: 'short' });                    // "seg."
+const isoLocal = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
 
-// Eventos das empresas (divulgação/conferência de resultado, dia do investidor) dos
-// próximos 7 dias contando hoje — a data mais próxima fica no topo.
+// Eventos das empresas (divulgação de resultado, dia do investidor) dos próximos 7 dias
+// contando hoje, em formato calendário: uma coluna por dia útil, tickers empilhados.
 function renderAgendaEmpresasCard(agenda) {
   const eventos = agenda?.eventos || [];
   let body;
   if (agenda?.unavailable) {
     body = `<p class="row-unavailable" style="padding:12px">${esc(agenda.reason || 'indisponível')}</p>`;
-  } else if (!eventos.length) {
-    body = '<p class="row-unavailable" style="padding:12px">sem eventos nos próximos 7 dias</p>';
+  } else if (!agenda?.de) {
+    body = '<p class="row-unavailable" style="padding:12px">carregando…</p>';
   } else {
-    body = eventos.map((ev) => {
-      const [y, m, d] = String(ev.date).split('-').map(Number);
-      const dt = new Date(y, m - 1, d);
-      // só monta a URL do ícone se for mesmo um ticker da B3: sem papel resolvido o
-      // backend devolve "CVM 20257", que não vira ícone nenhum e ainda entraria cru
-      // no atributo src.
-      const logo = /^[A-Z]{4}\d{1,2}$/.test(ev.ticker || '')
-        ? logoImg(null, ev.ticker)
-        : '<span class="row-logo"></span>'; // mantém a coluna, para os nomes alinharem
-      // o rótulo inteiro do evento não cabe na linha: fica no title, junto com a data
-      // por extenso, e a linha mostra as versões curtas.
-      const titulo = [ev.ticker, ev.empresa, ev.evento, dayFmt.format(dt)].filter(Boolean).join(' · ');
-      return `
-      <div class="row row-agenda" title="${esc(titulo)}">
-        ${logo}
-        <span class="row-name">${esc(ev.ticker || '')}</span>
-        <span class="row-symbol">${esc(ev.empresa)}</span>
-        <span class="ev-tag">${esc(ev.eventoCurto || ev.evento)}</span>
-        <span class="ev-data">${diaMesFmt.format(dt)}</span>
-      </div>`;
+    const porDia = new Map();
+    for (const ev of eventos) {
+      if (!porDia.has(ev.date)) porDia.set(ev.date, []);
+      porDia.get(ev.date).push(ev);
+    }
+    // colunas = dias úteis da janela; um fim de semana só aparece se tiver evento (raro),
+    // para nunca esconder um item — mercado fechado no sábado/domingo deixa a coluna fora.
+    const [y, m, d] = agenda.de.split('-').map(Number);
+    const dias = [];
+    for (let i = 0; i < 7; i++) {
+      const dt = new Date(y, m - 1, d + i);
+      const iso = isoLocal(dt);
+      if (agenda.ate && iso > agenda.ate) break;
+      const fds = dt.getDay() === 0 || dt.getDay() === 6;
+      if (!fds || porDia.has(iso)) dias.push({ iso, dt });
+    }
+    const cabecalhos = dias.map(({ dt }) => `
+      <div class="ag-head">
+        <span class="ag-dm">${agDiaMesFmt.format(dt)}</span>
+        <span class="ag-dow">${agDowFmt.format(dt).replace('.', '')}</span>
+      </div>`).join('');
+    const celulas = dias.map(({ iso }) => {
+      const doDia = (porDia.get(iso) || []).map((ev) => {
+        const titulo = [ev.ticker, ev.empresa, ev.evento].filter(Boolean).join(' · ');
+        const logo = /^[A-Z]{4}\d{1,2}$/.test(ev.ticker || '') ? logoImg(null, ev.ticker) : '';
+        return `<span class="ag-tk" title="${esc(titulo)}">${logo}${esc(ev.ticker || ev.empresa)}</span>`;
+      }).join('');
+      return `<div class="ag-cell">${doDia}</div>`;
     }).join('');
+    body = `<div class="ag-cal" style="grid-template-columns:repeat(${dias.length},minmax(0,1fr))">
+      ${cabecalhos}${celulas}
+    </div>`;
   }
   return `
     <section class="card">
       <div class="card-header">Agenda das Empresas (7 dias)</div>
-      <div class="card-body">${body}</div>
+      <div class="card-body ag-body">${body}</div>
     </section>`;
 }
 

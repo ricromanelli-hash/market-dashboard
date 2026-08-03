@@ -78,8 +78,10 @@ Passo a passo:
 
 ### Agenda das Empresas
 
-Card abaixo de *Petróleo & Gás*: divulgação de resultado, conferência de resultado e dia
-do investidor dos **próximos 7 dias contando o de hoje**, com a data mais próxima no topo.
+Card abaixo de *Petróleo & Gás*, em **formato calendário**: uma coluna por dia útil dos
+próximos 7 dias contando o de hoje, com os tickers que divulgam resultado empilhados sob
+cada data. Fim de semana só vira coluna se tiver algum evento (raro). O nome da empresa e
+o tipo/horário do evento ficam no `title` de cada ticker (tooltip).
 
 Três detalhes da leitura (`refreshAgendaEmpresas` em [server.js](server.js)):
 

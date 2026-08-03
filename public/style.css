@@ -562,36 +562,54 @@ body.tv-mode .row-values { grid-template-columns: 78px 76px; gap: 10px; }
 .row-change.down { color: var(--red-down); }
 .row-change.flat { color: var(--gray-flat); }
 
-/* Agenda das Empresas: um evento por linha, em colunas fixas (logo · ticker · nome ·
-   evento · data), para caber mais eventos e as colunas baterem entre as linhas.
-   O nome é a única coluna elástica — é ela que encolhe quando falta espaço. */
-.row-agenda {
+/* Agenda das Empresas em formato calendário: uma coluna por dia útil, tickers
+   empilhados na célula. As bordas superior/esquerda no contêiner mais a borda
+   direita/inferior de cada célula fecham a grade inteira (como uma tabela). */
+.ag-body { padding: 0; overflow-x: auto; }
+
+.ag-cal {
   display: grid;
-  grid-template-columns: 20px auto minmax(0, 1fr) auto auto;
+  border-top: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+}
+
+.ag-head,
+.ag-cell {
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.ag-head {
+  text-align: center;
+  padding: 3px 2px;
+  background: #f7f9f7;
+  line-height: 1.15;
+}
+.ag-dm { display: block; font-size: 10px; font-weight: 700; color: var(--green-header); }
+.ag-dow { display: block; font-size: 8.5px; color: var(--text-muted); }
+
+.ag-cell {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 5px;
-  padding: 5px 10px;
+  gap: 3px;
+  padding: 4px 2px;
+  min-height: 30px;
 }
 
-.row-agenda .row-symbol,
-.ev-tag {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ev-tag { font-size: 10px; color: var(--text-muted); }
-
-.ev-data {
-  font-size: 11px;
+.ag-tk {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
   font-weight: 600;
-  color: var(--green-header);
   white-space: nowrap;
-  text-transform: capitalize;
 }
+.ag-tk .row-logo { width: 13px; height: 13px; flex: 0 0 13px; }
 
-body.tv-mode .ev-tag { font-size: 10.5px; }
-body.tv-mode .ev-data { font-size: 11.5px; }
+body.tv-mode .ag-dm { font-size: 10.5px; }
+body.tv-mode .ag-dow { font-size: 9px; }
+body.tv-mode .ag-tk { font-size: 10px; }
 
 .row-unavailable {
   font-size: 12px;
