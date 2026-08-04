@@ -608,11 +608,10 @@ function renderAgendaEmpresasCard(agenda) {
       const fds = dt.getDay() === 0 || dt.getDay() === 6;
       if (!fds || porDia.has(iso)) dias.push({ iso, dt });
     }
+    // data e dia da semana na mesma linha ("05/08-QUA"): o cabeçalho fica com metade
+    // da altura, sem tirar informação
     const cabecalhos = dias.map(({ dt }) => `
-      <div class="ag-head">
-        <span class="ag-dm">${agDiaMesFmt.format(dt)}</span>
-        <span class="ag-dow">${agDowFmt.format(dt).replace('.', '')}</span>
-      </div>`).join('');
+      <div class="ag-head"><span class="ag-dm">${agDiaMesFmt.format(dt)}</span><span class="ag-dow">-${agDowFmt.format(dt).replace('.', '').toUpperCase()}</span></div>`).join('');
     const celulas = dias.map(({ iso }) => {
       const doDia = (porDia.get(iso) || []).map((ev) => {
         const titulo = [ev.ticker, ev.empresa, ev.evento].filter(Boolean).join(' · ');

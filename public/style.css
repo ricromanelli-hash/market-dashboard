@@ -617,14 +617,20 @@ body.tv-mode .row-values { grid-template-columns: 78px 76px; gap: 10px; }
   border-bottom: 1px solid var(--border);
 }
 
+/* Data e dia da semana na mesma linha ("05/08-QUA"): os dois spans ficam inline e o
+   cabeçalho ocupa uma linha em vez de duas. `nowrap` é essencial aqui — sem ele, numa
+   coluna estreita o texto quebra nas barras e no hífen e o cabeçalho vira um bloco de
+   várias linhas, pior que as duas originais. Daí também o padding lateral mínimo:
+   sobra folga para as 6 colunas da semana rara com evento no sábado ou domingo. */
 .ag-head {
   text-align: center;
-  padding: 3px 2px;
+  padding: 3px 1px;
   background: #f7f9f7;
   line-height: 1.15;
+  white-space: nowrap;
 }
-.ag-dm { display: block; font-size: 10px; font-weight: 700; color: var(--green-header); }
-.ag-dow { display: block; font-size: 8.5px; color: var(--text-muted); }
+.ag-dm { font-size: 10px; font-weight: 700; color: var(--green-header); }
+.ag-dow { font-size: 8.5px; color: var(--text-muted); }
 
 .ag-cell {
   display: flex;
@@ -646,7 +652,7 @@ body.tv-mode .row-values { grid-template-columns: 78px 76px; gap: 10px; }
 .ag-tk .row-logo { width: 13px; height: 13px; flex: 0 0 13px; }
 
 body.tv-mode .ag-dm { font-size: 10.5px; }
-body.tv-mode .ag-dow { font-size: 9px; }
+body.tv-mode .ag-dow { font-size: 8.5px; }
 body.tv-mode .ag-tk { font-size: 10px; }
 
 .row-unavailable {
