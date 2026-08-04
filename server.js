@@ -348,32 +348,34 @@ async function fetchQuote(symbol, fromSeries = false) {
     throw new Error(`Yahoo ${symbol}: sem preço`);
   }
   const price = meta.regularMarketPrice;
-  // Fechamento da sessão anterior = a última barra diária ANTERIOR à sessão de hoje.
-  // Não dá para pegar simplesmente a penúltima barra (closes[-2]): na pré-abertura, ou
-  // quando a série do Yahoo ainda não materializou a barra de hoje, a última barra passa
-  // a ser a de ontem e a penúltima a de anteontem — o % então compara com anteontem e
-  // dispara (o SANB11 já apareceu com +14,7% em vez de +1,2% depois de saltar 13% num
-  // dia). meta.chartPreviousClose também não serve: é o fechamento anterior ao início da
-  // janela pedida (~10 dias atrás), não o de ontem.
+  // Fechamento anterior = o da sessão imediatamente anterior à do preço ao vivo. Pegar a
+  // penúltima barra por posição (closes[-2]) não serve: quando a série do Yahoo chega
+  // atrasada — comum a partir do IP de datacenter do Render, onde ela vem com barras de
+  // dias atrás mas o `price` ao vivo atual — a última barra já é a de ontem e a penúltima
+  // a de anteontem, então o % compara com anteontem e dispara (o SANB11 apareceu +15,8%
+  // em vez de +2% depois de saltar 13% num dia). E não dá para confiar no
+  // `regularMarketTime`: nesse mesmo IP ele vem velho junto com a série, enquanto o preço
+  // é fresco. `meta.chartPreviousClose` também não serve — é o fechamento ~10 dias atrás.
   const stamps = result?.timestamp || [];
   const closeArr = result?.indicators?.quote?.[0]?.close || [];
   const bars = [];
   for (let i = 0; i < closeArr.length; i++) {
     if (typeof closeArr[i] === 'number' && stamps[i]) bars.push({ ts: stamps[i], close: closeArr[i] });
   }
-  // dia (UTC) de cada barra: os pregões de B3/EUA acontecem toda a sessão no mesmo dia
-  // UTC do timestamp, então a data UTC serve de chave de sessão sem depender de fuso.
   const diaUTC = (ts) => new Date(ts * 1000).toISOString().slice(0, 10);
-  const ultimaBarraTs = bars.length ? bars[bars.length - 1].ts : 0;
-  // sessão atual = a mais recente entre o último negócio e a última barra (cobre o caso
-  // de a série estar adiantada ou atrasada em relação ao preço ao vivo).
-  const sessaoAtual = diaUTC(Math.max(meta.regularMarketTime || 0, ultimaBarraTs));
+  const ultima = bars[bars.length - 1] || null;
+  const penultima = bars.length >= 2 ? bars[bars.length - 2] : null;
   let prevClose = null;
-  for (let i = bars.length - 1; i >= 0; i--) {
-    if (diaUTC(bars[i].ts) < sessaoAtual) { prevClose = bars[i].close; break; }
-  }
-  if (prevClose == null) {
-    prevClose = meta.previousClose ?? (bars.length >= 2 ? bars[bars.length - 2].close : null);
+  if (ultima) {
+    // A última barra é a "sessão atual" (e o fechamento anterior é a penúltima) quando ela
+    // é de hoje OU quando seu close ainda acompanha o preço ao vivo — caso da barra
+    // intradiária de hoje, cujo close se atualiza com o preço. Se o preço já se descolou
+    // dela e ela não é de hoje, a série está atrasada e a última barra JÁ é o fechamento
+    // anterior. Assim o cálculo não depende de nenhum timestamp do Yahoo, só do relógio
+    // do servidor (UTC) e do próprio preço.
+    const ultimaEhSessaoAtual = diaUTC(ultima.ts) >= diaUTC(Date.now() / 1000)
+      || Math.abs(price - ultima.close) <= ultima.close * 0.005;
+    prevClose = ultimaEhSessaoAtual ? (penultima ? penultima.close : ultima.close) : ultima.close;
   }
   const changePct = prevClose ? ((price - prevClose) / prevClose) * 100 : 0;
   return { price, changePct, currency: meta.currency ?? null };
