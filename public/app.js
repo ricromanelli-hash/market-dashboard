@@ -708,27 +708,45 @@ function renderMainNewsCard(data) {
     </section>`;
 }
 
-const dayFmt = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', weekday: 'short' });
+// Colunas do calendário do IBGE: só os dias que têm divulgação. As datas se espalham
+// por ~2 meses (o card de empresas cobre 7 dias corridos), então uma janela fixa
+// apareceria vazia quase sempre. O teto existe porque abaixo de ~60px a coluna não
+// comporta mais o cabeçalho "11/08-TER".
+const IBGE_MAX_COLUNAS = 8;
 
-function renderCalendarCard(calendar, limit) {
-  const list = limit ? (calendar || []).slice(0, limit) : calendar;
-  const rows = (list || []).map((ev) => {
-    const [d, m, y] = ev.date.split('/').map(Number);
-    const dt = new Date(y, m - 1, d);
-    return `
-      <div class="row">
-        <div class="row-label">
-          <span class="row-name">${ev.label}</span>
-          <span class="row-symbol">${ev.tag || ''}</span>
-        </div>
-        <div class="cal-date">${dayFmt.format(dt)}</div>
-      </div>`;
-  }).join('');
-  const body = rows || '<p class="row-unavailable" style="padding:12px">carregando…</p>';
+function renderCalendarCard(calendar) {
+  const eventos = calendar || [];
+  let body;
+  if (!eventos.length) {
+    body = '<p class="row-unavailable" style="padding:12px">carregando…</p>';
+  } else {
+    // o backend já entrega em ordem de data, então as colunas saem cronológicas
+    const porDia = new Map();
+    const dias = [];
+    for (const ev of eventos) {
+      const [d, m, y] = ev.date.split('/').map(Number);
+      const dt = new Date(y, m - 1, d);
+      const iso = isoLocal(dt);
+      if (!porDia.has(iso)) {
+        if (dias.length >= IBGE_MAX_COLUNAS) continue; // datas mais distantes ficam de fora
+        porDia.set(iso, []);
+        dias.push({ iso, dt });
+      }
+      porDia.get(iso).push(ev);
+    }
+    // mesma regra do card das empresas: dentro do dia, ordem alfabética do que aparece
+    for (const doDia of porDia.values()) {
+      doDia.sort((a, b) => (a.curto || a.label).localeCompare(b.curto || b.label, 'pt-BR'));
+    }
+    body = renderCalendarioDias(dias, porDia, 'ibge', (ev) => ({
+      texto: ev.curto || ev.label,
+      titulo: [ev.label, ev.tag].filter(Boolean).join(' · '),
+    }));
+  }
   return `
     <section class="card">
       <div class="card-header">Agenda IBGE (Brasil)</div>
-      <div class="card-body">${body}</div>
+      <div class="card-body ag-body">${body}</div>
     </section>`;
 }
 
@@ -745,6 +763,30 @@ const AG_MAX_TICKERS = 7;
 const agDiaMesFmt = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit' }); // "03/08"
 const agDowFmt = new Intl.DateTimeFormat('pt-BR', { weekday: 'short' });                    // "seg."
 const isoLocal = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+
+// Calendário usado pelas duas agendas (empresas e IBGE): uma coluna por dia, itens
+// empilhados e rolagem lenta na coluna que não couber. `dias` é a lista de colunas,
+// `porDia` mapeia iso -> eventos e `chip` traduz cada evento no que aparece na célula.
+function renderCalendarioDias(dias, porDia, chave, chip) {
+  // data e dia da semana na mesma linha ("05/08-QUA"): o cabeçalho fica com metade da
+  // altura, sem tirar informação
+  const cabecalhos = dias.map(({ dt }) => `
+    <div class="ag-head"><span class="ag-dm">${agDiaMesFmt.format(dt)}</span><span class="ag-dow">-${agDowFmt.format(dt).replace('.', '').toUpperCase()}</span></div>`).join('');
+  const celulas = dias.map(({ iso }) => {
+    const doDia = porDia.get(iso) || [];
+    const itens = doDia.map((ev) => {
+      const { texto, titulo, logo } = chip(ev);
+      return `<span class="ag-tk" title="${esc(titulo)}">${logo || ''}${esc(texto)}</span>`;
+    }).join('');
+    if (doDia.length <= AG_MAX_TICKERS) return `<div class="ag-cell">${itens}</div>`;
+    // altura de AG_MAX_TICKERS linhas; o excedente sobe em loop (ver emLoop)
+    const altura = `calc(${AG_MAX_TICKERS} * (var(--ag-tk-h) + var(--ag-tk-gap)) + 8px)`;
+    return `<div class="ag-cell ag-rolando" style="height:${altura}">${emLoop(itens, `${chave}-${iso}`)}</div>`;
+  }).join('');
+  return `<div class="ag-cal" style="grid-template-columns:repeat(${dias.length},minmax(0,1fr))">
+    ${cabecalhos}${celulas}
+  </div>`;
+}
 
 // Eventos das empresas (divulgação de resultado, dia do investidor) dos próximos 7 dias
 // contando hoje, em formato calendário: uma coluna por dia útil, tickers empilhados.
@@ -778,25 +820,11 @@ function renderAgendaEmpresasCard(agenda) {
       const fds = dt.getDay() === 0 || dt.getDay() === 6;
       if (!fds || porDia.has(iso)) dias.push({ iso, dt });
     }
-    // data e dia da semana na mesma linha ("05/08-QUA"): o cabeçalho fica com metade
-    // da altura, sem tirar informação
-    const cabecalhos = dias.map(({ dt }) => `
-      <div class="ag-head"><span class="ag-dm">${agDiaMesFmt.format(dt)}</span><span class="ag-dow">-${agDowFmt.format(dt).replace('.', '').toUpperCase()}</span></div>`).join('');
-    const celulas = dias.map(({ iso }) => {
-      const doDia = porDia.get(iso) || [];
-      const tickers = doDia.map((ev) => {
-        const titulo = [ev.ticker, ev.empresa, ev.evento].filter(Boolean).join(' · ');
-        const logo = /^[A-Z]{4}\d{1,2}$/.test(ev.ticker || '') ? logoImg(null, ev.ticker) : '';
-        return `<span class="ag-tk" title="${esc(titulo)}">${logo}${esc(ev.ticker || ev.empresa)}</span>`;
-      }).join('');
-      if (doDia.length <= AG_MAX_TICKERS) return `<div class="ag-cell">${tickers}</div>`;
-      // altura de AG_MAX_TICKERS linhas; o excedente sobe em loop (ver emLoop)
-      const altura = `calc(${AG_MAX_TICKERS} * (var(--ag-tk-h) + var(--ag-tk-gap)) + 8px)`;
-      return `<div class="ag-cell ag-rolando" style="height:${altura}">${emLoop(tickers, `agenda-${iso}`)}</div>`;
-    }).join('');
-    body = `<div class="ag-cal" style="grid-template-columns:repeat(${dias.length},minmax(0,1fr))">
-      ${cabecalhos}${celulas}
-    </div>`;
+    body = renderCalendarioDias(dias, porDia, 'agenda', (ev) => ({
+      texto: ev.ticker || ev.empresa,
+      titulo: [ev.ticker, ev.empresa, ev.evento].filter(Boolean).join(' · '),
+      logo: /^[A-Z]{4}\d{1,2}$/.test(ev.ticker || '') ? logoImg(null, ev.ticker) : '',
+    }));
   }
   return `
     <section class="card">
@@ -870,7 +898,7 @@ function cardBuilders(data) {
     'IndicesMundiais': () => renderWorldIndicesCard(data.worldIndices),
     'JurosReais': () => renderRealRatesCard(data.realRates),
     'Relogio': () => renderRelogioCard(data.clima),
-    'AgendaIBGE': () => renderCalendarCard(data.calendar, TV_MODE ? TV_AGENDA_LIMIT : undefined),
+    'AgendaIBGE': () => renderCalendarCard(data.calendar),
     'AgendaEmpresas': () => renderAgendaEmpresasCard(data.agendaEmpresas),
     'CalendarioEconomico': () => '<div id="calSlot" class="cal-slot"></div>',
     'NoticiasMacro': () => renderNewsCard(data.macroNews, 'Notícias — Indicadores Macro'),
@@ -948,8 +976,8 @@ const TV_MODE = new URLSearchParams(location.search).get('tv') === '1';
 const STAGE_W = 1920;
 const STAGE_H = 1080;
 // As duas caixas de notícias não cortam mais a lista: têm altura fixa (style.css) e o
-// que passa disso sobe em loop, então cabe o noticiário de hoje e de ontem inteiro.
-const TV_AGENDA_LIMIT = 5;      // eventos da Agenda IBGE que cabem acima do calendário
+// que passa disso sobe em loop, então cabe o noticiário de hoje e de ontem inteiro. A
+// Agenda IBGE também deixou de cortar: virou calendário, com uma coluna por dia.
 const CAL_IFRAME_W = 650;       // dimensões nativas do widget do Investing
 const CAL_IFRAME_H = 467;
 

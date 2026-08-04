@@ -212,18 +212,20 @@ const IPCA_SGS_SERIES = 13522; // IPCA - variação acumulada em 12 meses (BCB S
 // indicadores para nomes curtos; eventos fora desta lista são ignorados no card.
 const IBGE_CALENDAR_URL = 'https://servicodados.ibge.gov.br/api/v3/calendario/';
 // as chaves `match` são comparadas contra o título já normalizado (minúsculo, sem acento)
+// `curto` é a sigla que aparece na coluna do dia (o card virou calendário, igual ao das
+// empresas); `label` continua indo no balão da célula.
 const CALENDAR_LABELS = [
-  { match: 'consumidor amplo 15', label: 'IPCA-15', tag: 'Inflação' },
-  { match: 'consumidor amplo', label: 'IPCA', tag: 'Inflação' },
-  { match: 'precos ao consumidor', label: 'INPC', tag: 'Inflação' },
-  { match: 'precos ao produtor', label: 'IPP', tag: 'Inflação' },
-  { match: 'contas nacionais trimestrais', label: 'PIB (trimestral)', tag: 'Atividade' },
-  { match: 'domicilios continua mensal', label: 'Desemprego (PNAD mensal)', tag: 'Emprego' },
-  { match: 'domicilios continua trimestral', label: 'Desemprego (PNAD trimestral)', tag: 'Emprego' },
-  { match: 'industrial mensal', label: 'Produção Industrial', tag: 'Atividade' },
-  { match: 'mensal de comercio', label: 'Varejo (PMC)', tag: 'Atividade' },
-  { match: 'mensal de servicos', label: 'Serviços (PMS)', tag: 'Atividade' },
-  { match: 'construcao civil', label: 'Custos Construção (SINAPI)', tag: 'Inflação' },
+  { match: 'consumidor amplo 15', label: 'IPCA-15', curto: 'IPCA-15', tag: 'Inflação' },
+  { match: 'consumidor amplo', label: 'IPCA', curto: 'IPCA', tag: 'Inflação' },
+  { match: 'precos ao consumidor', label: 'INPC', curto: 'INPC', tag: 'Inflação' },
+  { match: 'precos ao produtor', label: 'IPP', curto: 'IPP', tag: 'Inflação' },
+  { match: 'contas nacionais trimestrais', label: 'PIB (trimestral)', curto: 'PIB', tag: 'Atividade' },
+  { match: 'domicilios continua mensal', label: 'Desemprego (PNAD mensal)', curto: 'PNAD-M', tag: 'Emprego' },
+  { match: 'domicilios continua trimestral', label: 'Desemprego (PNAD trimestral)', curto: 'PNAD-T', tag: 'Emprego' },
+  { match: 'industrial mensal', label: 'Produção Industrial', curto: 'PIM', tag: 'Atividade' },
+  { match: 'mensal de comercio', label: 'Varejo (PMC)', curto: 'PMC', tag: 'Atividade' },
+  { match: 'mensal de servicos', label: 'Serviços (PMS)', curto: 'PMS', tag: 'Atividade' },
+  { match: 'construcao civil', label: 'Custos Construção (SINAPI)', curto: 'SINAPI', tag: 'Inflação' },
 ];
 const NEWS_FEEDS = [
   { source: 'InfoMoney', url: 'https://www.infomoney.com.br/feed/' },
@@ -1267,7 +1269,7 @@ async function refreshCalendar() {
     const map = CALENDAR_LABELS.find((c) => titulo.includes(c.match));
     if (!map) continue; // mantém só os principais indicadores
     const [dia] = String(it.data_divulgacao).split(' '); // "dd/MM/yyyy HH:mm:ss"
-    events.push({ date: dia, label: map.label, tag: map.tag, fullTitle: it.titulo });
+    events.push({ date: dia, label: map.label, curto: map.curto, tag: map.tag, fullTitle: it.titulo });
   }
   const parse = (s) => {
     const [d, m, y] = s.split('/').map(Number);
