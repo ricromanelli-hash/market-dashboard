@@ -510,6 +510,41 @@ function renderCpiRow(cpi) {
     </div>`;
 }
 
+// ---- Rolagem em loop (agenda e notícias) ----
+// Onde o conteúdo não cabe, a lista sobe sozinha em vez de ser cortada. São duas cópias
+// idênticas empilhadas e um translateY(-50%), que termina exatamente sobre o início da
+// segunda — o loop não tem emenda visível.
+const ROLL_PX_S = 7; // velocidade, bem lenta: uma manchete leva ~7s para subir
+
+function emLoop(html) {
+  if (!html) return html;
+  return `<div class="roll">
+    <div class="roll-seg">${html}</div>
+    <div class="roll-seg" aria-hidden="true">${html}</div>
+  </div>`;
+}
+
+// Roda depois de cada render: mede a cópia contra o espaço visível e só anima o que
+// realmente transborda (nos cards sem altura fixa, a segunda cópia fica escondida).
+// O atraso negativo amarra a fase ao relógio — sem ele o refresh de 30s, que recria os
+// cards, faria toda rolagem voltar ao topo.
+function ativarRolagens() {
+  document.querySelectorAll('.roll').forEach((roll) => {
+    const seg = roll.querySelector('.roll-seg');
+    if (!seg) return;
+    const cabe = seg.offsetHeight <= roll.parentElement.clientHeight;
+    roll.classList.toggle('roll-parado', cabe);
+    if (cabe) {
+      roll.style.animationDuration = '';
+      roll.style.animationDelay = '';
+      return;
+    }
+    const durMs = Math.round((seg.offsetHeight / ROLL_PX_S) * 1000);
+    roll.style.animationDuration = `${durMs}ms`;
+    roll.style.animationDelay = `-${Date.now() % durMs}ms`;
+  });
+}
+
 function renderNewsItems(news, emptyMsg = 'carregando…') {
   return (news || []).map((n) => `
     <div class="news-item">
@@ -518,25 +553,37 @@ function renderNewsItems(news, emptyMsg = 'carregando…') {
     </div>`).join('') || `<p class="row-unavailable" style="padding:12px">${emptyMsg}</p>`;
 }
 
-function renderNewsCard(news, title = 'Notícias', limit) {
-  const list = limit ? (news || []).slice(0, limit) : news;
+// Só as manchetes de hoje e de ontem: o card é o retrato do noticiário recente, não um
+// arquivo. Se nada tão novo chegou (feed parado, segunda de manhã), mostra as últimas
+// mesmo assim — card vazio pareceria defeito.
+const NOTICIAS_MINIMO = 3;
+
+function noticiasRecentes(news) {
+  const lista = news || [];
+  const limite = new Date();
+  limite.setHours(0, 0, 0, 0);
+  limite.setDate(limite.getDate() - 1); // 00h de ontem
+  const recentes = lista.filter((n) => n.pubDate && new Date(n.pubDate) >= limite);
+  return recentes.length ? recentes : lista.slice(0, NOTICIAS_MINIMO);
+}
+
+function renderNewsCard(news, title = 'Notícias') {
   return `
-    <section class="card">
+    <section class="card news-card news-card-macro">
       <div class="card-header">${title}</div>
-      <div class="card-body">${renderNewsItems(list)}</div>
+      <div class="card-body">${emLoop(renderNewsItems(noticiasRecentes(news)))}</div>
     </section>`;
 }
 
 // Card de notícias com filtro "Todas / Minhas empresas".
-function renderMainNewsCard(data, limit) {
+function renderMainNewsCard(data) {
   const showCompany = newsFilter === 'company';
-  let list = showCompany ? data.companyNews : data.news;
-  if (limit) list = (list || []).slice(0, limit);
+  const list = noticiasRecentes(showCompany ? data.companyNews : data.news);
   const emptyMsg = showCompany
     ? 'Nenhuma notícia recente sobre as empresas que você acompanha.'
     : 'carregando…';
   return `
-    <section class="card">
+    <section class="card news-card news-card-empresas">
       <div class="card-header news-header">
         <span>Notícias</span>
         <span class="news-toggle">
@@ -544,7 +591,7 @@ function renderMainNewsCard(data, limit) {
           <button data-newsfilter="company" class="${showCompany ? 'active' : ''}">Minhas empresas</button>
         </span>
       </div>
-      <div class="card-body">${renderNewsItems(list, emptyMsg)}</div>
+      <div class="card-body">${emLoop(renderNewsItems(list, emptyMsg))}</div>
     </section>`;
 }
 
@@ -579,10 +626,8 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => (
 ));
 
 // Acima de AG_MAX_TICKERS o dia não estica o card: a coluna vira uma lista que rola
-// devagar em loop, mostrando todos os tickers do dia. O ritmo é por ticker, para um dia
-// cheio não passar mais rápido que um dia magro.
+// devagar em loop (ROLL_PX_S), mostrando todos os tickers do dia.
 const AG_MAX_TICKERS = 7;
-const AG_SEG_POR_TICKER = 3;
 
 const agDiaMesFmt = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit' }); // "03/08"
 const agDowFmt = new Intl.DateTimeFormat('pt-BR', { weekday: 'short' });                    // "seg."
@@ -632,18 +677,9 @@ function renderAgendaEmpresasCard(agenda) {
         return `<span class="ag-tk" title="${esc(titulo)}">${logo}${esc(ev.ticker || ev.empresa)}</span>`;
       }).join('');
       if (doDia.length <= AG_MAX_TICKERS) return `<div class="ag-cell">${tickers}</div>`;
-      // Duas cópias da lista e translateY(-50%): o ciclo termina exatamente sobre a
-      // cópia, então o loop não tem salto. O atraso negativo amarra a animação ao
-      // relógio — sem ele, o refresh de 30s recria o card e a rolagem volta ao topo.
-      const dur = doDia.length * AG_SEG_POR_TICKER;
-      const fase = -(Date.now() % (dur * 1000));
+      // altura de AG_MAX_TICKERS linhas; o excedente sobe em loop (ver emLoop)
       const altura = `calc(${AG_MAX_TICKERS} * (var(--ag-tk-h) + var(--ag-tk-gap)) + 8px)`;
-      return `<div class="ag-cell ag-rolando" style="height:${altura}">
-        <div class="ag-roll" style="animation-duration:${dur}s;animation-delay:${fase}ms">
-          <div class="ag-seg">${tickers}</div>
-          <div class="ag-seg" aria-hidden="true">${tickers}</div>
-        </div>
-      </div>`;
+      return `<div class="ag-cell ag-rolando" style="height:${altura}">${emLoop(tickers)}</div>`;
     }).join('');
     body = `<div class="ag-cal" style="grid-template-columns:repeat(${dias.length},minmax(0,1fr))">
       ${cabecalhos}${celulas}
@@ -712,7 +748,6 @@ async function loadData() {
 // os iframes vivem fora do #grid e são sobrepostos por positionCalWidget.
 function cardBuilders(data) {
   const g = data.groups || {};
-  const newsLimit = TV_MODE ? TV_NEWS_LIMIT : undefined;
   const builders = {
     'Destaques': () => renderHighlightsCard(data),
     'FearGreed': () => renderSentimentoCard(data.fearGreed, data.sentimentoBr),
@@ -724,8 +759,8 @@ function cardBuilders(data) {
     'AgendaIBGE': () => renderCalendarCard(data.calendar, TV_MODE ? TV_AGENDA_LIMIT : undefined),
     'AgendaEmpresas': () => renderAgendaEmpresasCard(data.agendaEmpresas),
     'CalendarioEconomico': () => '<div id="calSlot" class="cal-slot"></div>',
-    'NoticiasMacro': () => renderNewsCard(data.macroNews, 'Notícias — Indicadores Macro', newsLimit),
-    'NoticiasEmpresas': () => renderMainNewsCard(data, TV_MODE ? TV_MAIN_NEWS_LIMIT : undefined),
+    'NoticiasMacro': () => renderNewsCard(data.macroNews, 'Notícias — Indicadores Macro'),
+    'NoticiasEmpresas': () => renderMainNewsCard(data),
   };
   // demais setores vêm direto do backend
   for (const title of Object.keys(g)) {
@@ -772,6 +807,8 @@ function render(data) {
 
   // alinha os iframes persistentes sobre seus slots recém-criados
   positionCalWidget();
+  // depende da medição dos cards já no DOM, por isso vem depois do innerHTML
+  ativarRolagens();
 
   if (data.updatedAt) {
     // hash do commit no ar, logo após o horário — serve para conferir na TV se o deploy
@@ -795,8 +832,8 @@ grid.addEventListener('click', (e) => {
 const TV_MODE = new URLSearchParams(location.search).get('tv') === '1';
 const STAGE_W = 1920;
 const STAGE_H = 1080;
-const TV_NEWS_LIMIT = 3;        // menos manchetes na TV, porém com o título inteiro
-const TV_MAIN_NEWS_LIMIT = 4;   // o card de empresas cabe uma manchete a mais
+// As duas caixas de notícias não cortam mais a lista: têm altura fixa (style.css) e o
+// que passa disso sobe em loop, então cabe o noticiário de hoje e de ontem inteiro.
 const TV_AGENDA_LIMIT = 5;      // eventos da Agenda IBGE que cabem acima do calendário
 const CAL_IFRAME_W = 650;       // dimensões nativas do widget do Investing
 const CAL_IFRAME_H = 467;

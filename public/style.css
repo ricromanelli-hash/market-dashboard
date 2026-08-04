@@ -657,38 +657,51 @@ body.tv-mode .row-values { grid-template-columns: 78px 76px; gap: 10px; }
 }
 .ag-tk .row-logo { width: 13px; height: 13px; flex: 0 0 13px; }
 
-/* Dia com mais tickers do que cabe: a coluna ganha altura fixa e a lista rola em loop,
-   em vez de esticar o card inteiro por causa de um único dia cheio. A altura vem inline
-   do app.js, que é quem sabe quantas linhas cabem. */
+/* Dia com mais tickers do que cabe: a coluna ganha altura fixa e a lista rola em loop
+   (ver .roll), em vez de esticar o card inteiro por causa de um único dia cheio. A
+   altura vem inline do app.js, que é quem sabe quantas linhas cabem. */
 .ag-cell.ag-rolando {
   display: block;
   overflow: hidden;
   padding: 4px 2px;
 }
-.ag-roll { animation: ag-roll linear infinite; }
-/* As duas cópias são idênticas e cada linha mede o mesmo, então -50% cai exatamente
-   sobre o início da segunda — o loop não tem emenda visível. */
-@keyframes ag-roll {
-  from { transform: translateY(0); }
-  to { transform: translateY(-50%); }
-}
-/* `flow-root` impede que a margem do último ticker escape da cópia: sem isso cada
-   cópia mede 3px a menos que o passo real e o loop fecha desalinhado. */
-.ag-seg { display: flow-root; }
-.ag-roll .ag-tk {
+.roll .ag-tk {
   display: flex;
   justify-content: center;
   height: var(--ag-tk-h);
   margin-bottom: var(--ag-tk-gap);
 }
 
-/* Quem pediu menos animação no sistema não vê a rolagem; a coluna vira rolável à mão
-   para nenhum ticker ficar inacessível. */
-@media (prefers-reduced-motion: reduce) {
-  .ag-roll { animation: none; }
-  .ag-cell.ag-rolando { overflow-y: auto; }
-  .ag-roll .ag-seg[aria-hidden] { display: none; }
+/* ---- Rolagem em loop, usada pela agenda e pelas duas caixas de notícias ---- */
+/* Duas cópias idênticas: -50% cai exatamente sobre o início da segunda e o loop não
+   tem emenda visível. Duração e fase são calculadas no app.js, por medição. */
+.roll { animation: roll linear infinite; }
+@keyframes roll {
+  from { transform: translateY(0); }
+  to { transform: translateY(-50%); }
 }
+/* `flow-root` impede que a margem do último item escape da cópia: sem isso cada cópia
+   mede alguns px a menos que o passo real e o loop fecha desalinhado. */
+.roll-seg { display: flow-root; }
+/* Conteúdo que cabe inteiro: sem animação e sem a segunda cópia. */
+.roll-parado { animation: none; }
+.roll-parado .roll-seg[aria-hidden] { display: none; }
+
+/* Quem pediu menos animação no sistema não vê a rolagem; a caixa vira rolável à mão
+   para nenhum item ficar inacessível. */
+@media (prefers-reduced-motion: reduce) {
+  .roll { animation: none; }
+  .roll .roll-seg[aria-hidden] { display: none; }
+  .ag-cell.ag-rolando,
+  body.tv-mode .news-card .card-body { overflow-y: auto; }
+}
+
+/* Modo TV: as caixas de notícias têm altura fixa e a lista rola dentro delas. Sem isso
+   um dia de muitas manchetes empurraria os cards de baixo para fora do palco de 1080px.
+   Os valores são a altura que os cards já ocupavam com o corte de 3 e 4 manchetes. */
+body.tv-mode .news-card .card-body { overflow: hidden; }
+body.tv-mode .news-card-macro .card-body { height: 168px; }
+body.tv-mode .news-card-empresas .card-body { height: 211px; }
 
 body.tv-mode .ag-dm { font-size: 10.5px; }
 body.tv-mode .ag-dow { font-size: 8.5px; }
