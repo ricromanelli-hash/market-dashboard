@@ -320,6 +320,29 @@ const FOLLOWED_COMPANIES = (() => {
   }));
 })();
 
+const diaUTC = (ts) => new Date(ts * 1000).toISOString().slice(0, 10);
+
+// Fechamento anterior via série INTRADIÁRIA. A partir do IP de datacenter do Render, o
+// Yahoo às vezes devolve o close diário de dias recentes como null (31/07, 03/08 vieram
+// vazios), mesmo a série de 30m tendo os dados — daí o % do dia disparava (SANB11 +15,8%
+// em vez de +1,2%). Cache por (símbolo|dia): o fechamento de um dia não muda, então busca
+// uma vez só e reaproveita nos ciclos seguintes.
+const prevCloseCache = new Map();
+
+async function intradayPrevClose(symbol, dia) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=30m&range=7d`;
+  const r = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(20000) });
+  if (!r.ok) return null;
+  const result = (await r.json())?.chart?.result?.[0];
+  const stamps = result?.timestamp || [];
+  const closes = result?.indicators?.quote?.[0]?.close || [];
+  let val = null; // último close não-nulo do dia pedido
+  for (let i = 0; i < stamps.length; i++) {
+    if (diaUTC(stamps[i]) === dia && typeof closes[i] === 'number') val = closes[i];
+  }
+  return val;
+}
+
 // `fromSeries`: usa o último fechamento da série em vez de meta.regularMarketPrice.
 // Necessário para índices como o TIO=F (minério), cujo campo de cotação do Yahoo está
 // parado em 2021 embora a série diária continue atualizada. Devolve também a data
@@ -357,34 +380,41 @@ async function fetchQuote(symbol, fromSeries = false) {
     throw new Error(`Yahoo ${symbol}: sem preço`);
   }
   const price = meta.regularMarketPrice;
-  // Fechamento anterior = o da sessão imediatamente anterior à do preço ao vivo. Pegar a
-  // penúltima barra por posição (closes[-2]) não serve: quando a série do Yahoo chega
-  // atrasada — comum a partir do IP de datacenter do Render, onde ela vem com barras de
-  // dias atrás mas o `price` ao vivo atual — a última barra já é a de ontem e a penúltima
-  // a de anteontem, então o % compara com anteontem e dispara (o SANB11 apareceu +15,8%
-  // em vez de +2% depois de saltar 13% num dia). E não dá para confiar no
-  // `regularMarketTime`: nesse mesmo IP ele vem velho junto com a série, enquanto o preço
-  // é fresco. `meta.chartPreviousClose` também não serve — é o fechamento ~10 dias atrás.
+  // Fechamento por dia da série diária (um close por dia; pode vir null em dias recentes
+  // a partir do IP do Render). `diasTrade` guarda a ordem cronológica dos pregões.
   const stamps = result?.timestamp || [];
   const closeArr = result?.indicators?.quote?.[0]?.close || [];
-  const bars = [];
-  for (let i = 0; i < closeArr.length; i++) {
-    if (typeof closeArr[i] === 'number' && stamps[i]) bars.push({ ts: stamps[i], close: closeArr[i] });
+  const closePorDia = new Map();
+  const diasTrade = [];
+  for (let i = 0; i < stamps.length; i++) {
+    const d = diaUTC(stamps[i]);
+    if (!closePorDia.has(d)) diasTrade.push(d);
+    closePorDia.set(d, typeof closeArr[i] === 'number' ? closeArr[i] : (closePorDia.get(d) ?? null));
   }
-  const diaUTC = (ts) => new Date(ts * 1000).toISOString().slice(0, 10);
-  const ultima = bars[bars.length - 1] || null;
-  const penultima = bars.length >= 2 ? bars[bars.length - 2] : null;
-  let prevClose = null;
-  if (ultima) {
-    // A última barra é a "sessão atual" (e o fechamento anterior é a penúltima) quando ela
-    // é de hoje OU quando seu close ainda acompanha o preço ao vivo — caso da barra
-    // intradiária de hoje, cujo close se atualiza com o preço. Se o preço já se descolou
-    // dela e ela não é de hoje, a série está atrasada e a última barra JÁ é o fechamento
-    // anterior. Assim o cálculo não depende de nenhum timestamp do Yahoo, só do relógio
-    // do servidor (UTC) e do próprio preço.
-    const ultimaEhSessaoAtual = diaUTC(ultima.ts) >= diaUTC(Date.now() / 1000)
-      || Math.abs(price - ultima.close) <= ultima.close * 0.005;
-    prevClose = ultimaEhSessaoAtual ? (penultima ? penultima.close : ultima.close) : ultima.close;
+  const hojeUTC = diaUTC(Date.now() / 1000);
+  const ultimoDia = diasTrade[diasTrade.length - 1] || null;
+  // Sessão a que o preço ao vivo pertence: hoje se já há barra de hoje; senão, o último
+  // pregão se o preço é igual ao fechamento dele (mercado fechado), ou hoje se o preço já
+  // se descolou (série atrasada mas preço ao vivo).
+  let sessaoDia;
+  if (ultimoDia && ultimoDia >= hojeUTC) {
+    sessaoDia = ultimoDia;
+  } else {
+    const cUlt = ultimoDia ? closePorDia.get(ultimoDia) : null;
+    sessaoDia = (cUlt != null && Math.abs(price - cUlt) <= cUlt * 0.005) ? ultimoDia : hojeUTC;
+  }
+  // Fechamento anterior = close do pregão imediatamente anterior à sessão atual. Se o
+  // diário veio nulo nesse dia (caso Render), busca no intradiário (com cache).
+  const diaAnterior = diasTrade.filter((d) => d < sessaoDia).pop() || null;
+  let prevClose = diaAnterior ? closePorDia.get(diaAnterior) : null;
+  if (prevClose == null && diaAnterior) {
+    const chave = `${symbol}|${diaAnterior}`;
+    if (prevCloseCache.has(chave)) {
+      prevClose = prevCloseCache.get(chave);
+    } else {
+      prevClose = await intradayPrevClose(symbol, diaAnterior);
+      if (prevClose != null) prevCloseCache.set(chave, prevClose);
+    }
   }
   const changePct = prevClose ? ((price - prevClose) / prevClose) * 100 : 0;
   return { price, changePct, currency: meta.currency ?? null };
