@@ -386,7 +386,7 @@ const relogioHoraFmt = new Intl.DateTimeFormat('pt-BR', {
   timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
 });
 const relogioDataFmt = new Intl.DateTimeFormat('pt-BR', {
-  timeZone: 'America/Sao_Paulo', weekday: 'long', day: '2-digit', month: 'long',
+  timeZone: 'America/Sao_Paulo', weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
 });
 
 function renderRelogioCard() {

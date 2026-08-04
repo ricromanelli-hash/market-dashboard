@@ -685,8 +685,9 @@ body.tv-mode .row-values { grid-template-columns: 78px 76px; gap: 10px; }
 }
 .clock-date {
   font-size: 10.5px;
-  color: var(--text-muted);
-  text-transform: capitalize; /* "terça-feira, 04 de agosto" */
+  font-weight: 700;
+  color: var(--red-down);
+  text-transform: capitalize; /* "terça-feira, 04 de agosto de 2026" */
 }
 
 /* ---- Rolagem em loop, usada pela agenda e pelas duas caixas de notícias ---- */
