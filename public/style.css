@@ -675,19 +675,41 @@ body.tv-mode .row-values { grid-template-columns: 78px 76px; gap: 10px; }
 /* ---- Relógio do painel ---- */
 /* Alturas apertadas de propósito: o card fecha a coluna 2 e precisa caber nos ~90px
    que sobram até o fim do palco de 1080px. */
-.clock-body { text-align: center; padding: 4px 8px 6px; }
-.clock-time {
-  font-size: 30px;
+.clock-body { text-align: center; padding: 3px 8px 6px; }
+.clock-dow {
+  font-size: 13px;
   font-weight: 700;
-  line-height: 1.05;
+  text-transform: capitalize; /* "Terça" */
+  color: var(--text);
+}
+/* hora · data · temperatura na mesma linha, a data centrada como na planilha */
+.clock-linha {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+}
+.clock-time {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.1;
   color: var(--green-header);
   font-variant-numeric: tabular-nums; /* sem isso a largura pula a cada segundo */
 }
 .clock-date {
-  font-size: 10.5px;
+  font-size: 19px;
   font-weight: 700;
   color: var(--red-down);
-  text-transform: capitalize; /* "terça-feira, 04 de agosto de 2026" */
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.clock-temp {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
 /* ---- Rolagem em loop, usada pela agenda e pelas duas caixas de notícias ---- */

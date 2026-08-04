@@ -385,18 +385,38 @@ function atualizarRelogios() {
 const relogioHoraFmt = new Intl.DateTimeFormat('pt-BR', {
   timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
 });
-const relogioDataFmt = new Intl.DateTimeFormat('pt-BR', {
-  timeZone: 'America/Sao_Paulo', weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
+// "Terça" (o dia da semana cheio, sem o "-feira") e "04/AGO/2026".
+const relogioDiaSemanaFmt = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long' });
+const relogioDataPartes = new Intl.DateTimeFormat('pt-BR', {
+  timeZone: 'America/Sao_Paulo', day: '2-digit', month: 'short', year: 'numeric',
 });
 
-function renderRelogioCard() {
+function diaDaSemana(agora) {
+  return relogioDiaSemanaFmt.format(agora).replace(/-feira$/, '');
+}
+
+// O formato 'short' do mês vem como "ago." (com ponto); aqui vira "AGO".
+function dataCurta(agora) {
+  const p = relogioDataPartes.formatToParts(agora);
+  const val = (t) => p.find((x) => x.type === t)?.value || '';
+  return `${val('day')}/${val('month').replace('.', '').toUpperCase()}/${val('year')}`;
+}
+
+function renderRelogioCard(clima) {
   const agora = new Date();
+  const temp = typeof clima?.temp === 'number'
+    ? `${clima.temp} Graus`
+    : '—';
   return `
     <section class="card clock-card">
       <div class="card-header">Horário de Brasília</div>
       <div class="card-body clock-body">
-        <div class="clock-time" id="clockTime">${relogioHoraFmt.format(agora)}</div>
-        <div class="clock-date" id="clockDate">${relogioDataFmt.format(agora)}</div>
+        <div class="clock-dow" id="clockDow">${diaDaSemana(agora)}</div>
+        <div class="clock-linha">
+          <span class="clock-time" id="clockTime">${relogioHoraFmt.format(agora)}</span>
+          <span class="clock-date" id="clockDate">${dataCurta(agora)}</span>
+          <span class="clock-temp" title="${clima?.cidade ? 'temperatura em ' + clima.cidade : 'temperatura indisponível'}">${temp}</span>
+        </div>
       </div>
     </section>`;
 }
@@ -407,8 +427,10 @@ function atualizarRelogioPainel() {
   const agora = new Date();
   const hora = document.getElementById('clockTime');
   const data = document.getElementById('clockDate');
+  const dow = document.getElementById('clockDow');
   if (hora) hora.textContent = relogioHoraFmt.format(agora);
-  if (data) data.textContent = relogioDataFmt.format(agora);
+  if (data) data.textContent = dataCurta(agora);
+  if (dow) dow.textContent = diaDaSemana(agora);
 }
 
 // Card de destaques: poucos números em fonte grande, para leitura à distância na TV.
@@ -788,7 +810,7 @@ function cardBuilders(data) {
     'Brasil': () => renderGroupCard('Brasil', g['Brasil'], renderBrasilRatesRows(data.brasilRates)),
     'IndicesMundiais': () => renderWorldIndicesCard(data.worldIndices),
     'JurosReais': () => renderRealRatesCard(data.realRates),
-    'Relogio': () => renderRelogioCard(),
+    'Relogio': () => renderRelogioCard(data.clima),
     'AgendaIBGE': () => renderCalendarCard(data.calendar, TV_MODE ? TV_AGENDA_LIMIT : undefined),
     'AgendaEmpresas': () => renderAgendaEmpresasCard(data.agendaEmpresas),
     'CalendarioEconomico': () => '<div id="calSlot" class="cal-slot"></div>',

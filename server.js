@@ -291,6 +291,7 @@ const cache = {
   fearGreed: null,
   sentimentoBr: null,
   agendaEmpresas: { de: null, ate: null, eventos: [] },
+  clima: null,
   errors: [],
 };
 
@@ -830,6 +831,18 @@ async function refreshFearGreed() {
   };
 }
 
+// Temperatura atual de São Paulo, no card do relógio. Open-Meteo é aberta e sem
+// cadastro; `current` já devolve a leitura mais recente, então não há série para tratar.
+const CLIMA_URL = 'https://api.open-meteo.com/v1/forecast'
+  + '?latitude=-23.5505&longitude=-46.6333&current=temperature_2m&timezone=America%2FSao_Paulo';
+
+async function refreshClima() {
+  const json = await fetchJsonWithRetry(CLIMA_URL, 'Open-Meteo (temperatura)', 2, 15000);
+  const temp = Number(json?.current?.temperature_2m);
+  if (!Number.isFinite(temp)) throw new Error('Open-Meteo: sem temperatura');
+  cache.clima = { temp: Math.round(temp), cidade: 'São Paulo' };
+}
+
 // PIB anual (crescimento %) dos 8 países, via World Bank Data360
 const gdpByCountry = new Map();
 
@@ -1352,6 +1365,7 @@ async function refreshSlowData() {
     })(),
     refreshDiFutures(),
     refreshFearGreed(),
+    refreshClima(),
     refreshHistory(),
     refreshNews(),
     refreshMacroNews(),
