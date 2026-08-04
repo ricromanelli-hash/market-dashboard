@@ -603,6 +603,12 @@ function renderAgendaEmpresasCard(agenda) {
       if (!porDia.has(ev.date)) porDia.set(ev.date, []);
       porDia.get(ev.date).push(ev);
     }
+    // dentro do dia, ordem alfabética do ticker — é o texto que aparece na célula
+    // (quando não há ticker, o nome da empresa entra no lugar e ordena junto)
+    const rotulo = (ev) => ev.ticker || ev.empresa || '';
+    for (const doDia of porDia.values()) {
+      doDia.sort((a, b) => rotulo(a).localeCompare(rotulo(b), 'pt-BR'));
+    }
     // colunas = dias úteis da janela; um fim de semana só aparece se tiver evento (raro),
     // para nunca esconder um item — mercado fechado no sábado/domingo deixa a coluna fora.
     const [y, m, d] = agenda.de.split('-').map(Number);
