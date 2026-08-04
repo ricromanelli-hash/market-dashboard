@@ -657,6 +657,11 @@ async function refreshMarketData() {
   }
   cache.worldIndices = regions;
 
+  // o clima mora no ciclo lento, mas quando falha não espera meia hora para tentar
+  if (cache.clima?.unavailable && Date.now() - ultimaTentativaClima > CLIMA_RETRY_MS) {
+    refreshClima().catch(() => {}); // o motivo já fica em cache.clima.reason
+  }
+
   cache.quotesUpdatedAt = new Date().toISOString();
   cache.updatedAt = new Date().toISOString();
 }
@@ -851,19 +856,32 @@ const CONDICOES = [
   { ate: 99, cond: 'tempestade', texto: 'tempestade' },
 ];
 
+// Nova tentativa em 5 min quando falha, em vez de esperar o ciclo lento de 30 —
+// sem descer a cada 30s, que só ajudaria a bater no limite de requisições da API.
+const CLIMA_RETRY_MS = 5 * 60 * 1000;
+let ultimaTentativaClima = 0;
+
 async function refreshClima() {
-  const json = await fetchJsonWithRetry(CLIMA_URL, 'Open-Meteo (temperatura)', 2, 15000);
-  const temp = Number(json?.current?.temperature_2m);
-  if (!Number.isFinite(temp)) throw new Error('Open-Meteo: sem temperatura');
-  const code = Number(json?.current?.weather_code);
-  const faixa = CONDICOES.find((c) => code <= c.ate) || CONDICOES[CONDICOES.length - 1];
-  cache.clima = {
-    temp: Math.round(temp),
-    cond: faixa.cond,
-    texto: faixa.texto,
-    dia: json?.current?.is_day !== 0,
-    cidade: 'São Paulo',
-  };
+  ultimaTentativaClima = Date.now();
+  try {
+    const json = await fetchJsonWithRetry(CLIMA_URL, 'Open-Meteo (temperatura)', 2, 15000);
+    const temp = Number(json?.current?.temperature_2m);
+    if (!Number.isFinite(temp)) throw new Error('Open-Meteo: sem temperatura');
+    const code = Number(json?.current?.weather_code);
+    const faixa = CONDICOES.find((c) => code <= c.ate) || CONDICOES[CONDICOES.length - 1];
+    cache.clima = {
+      temp: Math.round(temp),
+      cond: faixa.cond,
+      texto: faixa.texto,
+      dia: json?.current?.is_day !== 0,
+      cidade: 'São Paulo',
+    };
+  } catch (err) {
+    // Guarda o motivo: sem isso o card mostra só "—" e não dá para saber se foi rede,
+    // limite de requisições ou resposta inesperada — foi o que aconteceu no Render.
+    cache.clima = { unavailable: true, reason: err.message };
+    throw err;
+  }
 }
 
 // PIB anual (crescimento %) dos 8 países, via World Bank Data360
