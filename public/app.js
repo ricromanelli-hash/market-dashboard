@@ -441,7 +441,7 @@ function renderRelogioCard(clima) {
   const agora = new Date();
   const temTemp = typeof clima?.temp === 'number';
   const titulo = temTemp
-    ? `${clima.cidade} · ${clima.texto}`
+    ? `${clima.cidade} · ${clima.texto}${clima.fonte ? ' · ' + clima.fonte : ''}`
     : `temperatura indisponível${clima?.reason ? ' — ' + clima.reason : ''}`;
   const temp = temTemp
     ? `${iconeClima(clima.cond, clima.dia)}<span class="temp-num">${clima.temp}</span><span class="temp-unit">°C</span>`

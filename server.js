@@ -844,7 +844,7 @@ const CLIMA_URL = 'https://api.open-meteo.com/v1/forecast'
   + '&timezone=America%2FSao_Paulo';
 
 // Faixas de código WMO agrupadas no que muda o desenho do ícone.
-const CONDICOES = [
+const CONDICOES_WMO = [
   { ate: 0, cond: 'limpo', texto: 'céu limpo' },
   { ate: 2, cond: 'parcial', texto: 'parcialmente nublado' },
   { ate: 3, cond: 'nublado', texto: 'nublado' },
@@ -856,32 +856,97 @@ const CONDICOES = [
   { ate: 99, cond: 'tempestade', texto: 'tempestade' },
 ];
 
-// Nova tentativa em 5 min quando falha, em vez de esperar o ciclo lento de 30 —
-// sem descer a cada 30s, que só ajudaria a bater no limite de requisições da API.
+const TEXTO_COND = {
+  limpo: 'céu limpo',
+  parcial: 'parcialmente nublado',
+  nublado: 'nublado',
+  neblina: 'neblina',
+  chuva: 'chuva',
+  neve: 'neve',
+  tempestade: 'tempestade',
+};
+
+async function climaOpenMeteo() {
+  const json = await fetchJsonWithRetry(CLIMA_URL, 'Open-Meteo', 2, 15000);
+  const temp = Number(json?.current?.temperature_2m);
+  if (!Number.isFinite(temp)) throw new Error('Open-Meteo: sem temperatura');
+  const code = Number(json?.current?.weather_code);
+  const faixa = CONDICOES_WMO.find((c) => code <= c.ate) || CONDICOES_WMO[CONDICOES_WMO.length - 1];
+  return { temp, cond: faixa.cond, dia: json?.current?.is_day !== 0 };
+}
+
+// Reserva para quando a Open-Meteo recusa (no Render ela devolve HTTP 429: a cota é
+// por IP e o endereço é compartilhado com o datacenter inteiro). A MET Norway limita
+// por User-Agent identificado, não por IP — e por isso exige um UA com contato: com
+// o UA genérico do painel ela responde 403.
+const MET_URL = 'https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=-23.5505&lon=-46.6333';
+const MET_UA = 'market-dashboard/1.0 (https://github.com/ricromanelli-hash/market-dashboard)';
+
+// Ex.: "partlycloudy_day", "lightrainshowers_night", "clearsky_day".
+function condDoSimbolo(simbolo) {
+  if (simbolo.includes('thunder')) return 'tempestade';
+  if (simbolo.includes('snow') || simbolo.includes('sleet')) return 'neve';
+  if (simbolo.includes('rain') || simbolo.includes('drizzle')) return 'chuva';
+  if (simbolo.includes('fog')) return 'neblina';
+  if (simbolo.startsWith('clearsky')) return 'limpo';
+  if (simbolo.startsWith('fair') || simbolo.startsWith('partlycloudy')) return 'parcial';
+  return 'nublado';
+}
+
+async function climaMetNorway() {
+  const res = await fetch(MET_URL, {
+    headers: { 'User-Agent': MET_UA, Accept: 'application/json' },
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw new Error(`MET Norway: HTTP ${res.status}`);
+  const json = await res.json();
+  const agora = json?.properties?.timeseries?.[0]?.data;
+  const temp = Number(agora?.instant?.details?.air_temperature);
+  if (!Number.isFinite(temp)) throw new Error('MET Norway: sem temperatura');
+  const simbolo = String(agora?.next_1_hours?.summary?.symbol_code
+    || agora?.next_6_hours?.summary?.symbol_code || '');
+  return { temp, cond: condDoSimbolo(simbolo), dia: !simbolo.endsWith('_night') };
+}
+
+const FONTES_CLIMA = [
+  { nome: 'Open-Meteo', ler: climaOpenMeteo },
+  { nome: 'MET Norway', ler: climaMetNorway },
+];
+// Índice da última fonte que funcionou: no Render a reserva assume e passa a ser a
+// primeira tentativa, em vez de gastar uma requisição recusada a cada ciclo.
+let fonteClimaOk = 0;
+
+// Nova tentativa em 5 min quando as duas falham, em vez de esperar o ciclo lento de
+// 30 — sem descer a cada 30s, que só ajudaria a bater no limite de requisições.
 const CLIMA_RETRY_MS = 5 * 60 * 1000;
 let ultimaTentativaClima = 0;
 
 async function refreshClima() {
   ultimaTentativaClima = Date.now();
-  try {
-    const json = await fetchJsonWithRetry(CLIMA_URL, 'Open-Meteo (temperatura)', 2, 15000);
-    const temp = Number(json?.current?.temperature_2m);
-    if (!Number.isFinite(temp)) throw new Error('Open-Meteo: sem temperatura');
-    const code = Number(json?.current?.weather_code);
-    const faixa = CONDICOES.find((c) => code <= c.ate) || CONDICOES[CONDICOES.length - 1];
-    cache.clima = {
-      temp: Math.round(temp),
-      cond: faixa.cond,
-      texto: faixa.texto,
-      dia: json?.current?.is_day !== 0,
-      cidade: 'São Paulo',
-    };
-  } catch (err) {
-    // Guarda o motivo: sem isso o card mostra só "—" e não dá para saber se foi rede,
-    // limite de requisições ou resposta inesperada — foi o que aconteceu no Render.
-    cache.clima = { unavailable: true, reason: err.message };
-    throw err;
+  const erros = [];
+  for (let i = 0; i < FONTES_CLIMA.length; i++) {
+    const idx = (fonteClimaOk + i) % FONTES_CLIMA.length;
+    const fonte = FONTES_CLIMA[idx];
+    try {
+      const leitura = await fonte.ler();
+      fonteClimaOk = idx;
+      cache.clima = {
+        temp: Math.round(leitura.temp),
+        cond: leitura.cond,
+        texto: TEXTO_COND[leitura.cond] || leitura.cond,
+        dia: leitura.dia,
+        cidade: 'São Paulo',
+        fonte: fonte.nome,
+      };
+      return;
+    } catch (err) {
+      erros.push(err.message);
+    }
   }
+  // Guarda o motivo: sem isso o card mostra só "—" e não dá para saber se foi rede,
+  // limite de requisições ou resposta inesperada.
+  cache.clima = { unavailable: true, reason: erros.join(' · ') };
+  throw new Error(`Temperatura: ${erros.join(' · ')}`);
 }
 
 // PIB anual (crescimento %) dos 8 países, via World Bank Data360
