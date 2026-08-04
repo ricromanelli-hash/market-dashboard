@@ -578,6 +578,12 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]
 ));
 
+// Acima de AG_MAX_TICKERS o dia não estica o card: a coluna vira uma lista que rola
+// devagar em loop, mostrando todos os tickers do dia. O ritmo é por ticker, para um dia
+// cheio não passar mais rápido que um dia magro.
+const AG_MAX_TICKERS = 7;
+const AG_SEG_POR_TICKER = 3;
+
 const agDiaMesFmt = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit' }); // "03/08"
 const agDowFmt = new Intl.DateTimeFormat('pt-BR', { weekday: 'short' });                    // "seg."
 const isoLocal = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
@@ -613,12 +619,25 @@ function renderAgendaEmpresasCard(agenda) {
     const cabecalhos = dias.map(({ dt }) => `
       <div class="ag-head"><span class="ag-dm">${agDiaMesFmt.format(dt)}</span><span class="ag-dow">-${agDowFmt.format(dt).replace('.', '').toUpperCase()}</span></div>`).join('');
     const celulas = dias.map(({ iso }) => {
-      const doDia = (porDia.get(iso) || []).map((ev) => {
+      const doDia = porDia.get(iso) || [];
+      const tickers = doDia.map((ev) => {
         const titulo = [ev.ticker, ev.empresa, ev.evento].filter(Boolean).join(' · ');
         const logo = /^[A-Z]{4}\d{1,2}$/.test(ev.ticker || '') ? logoImg(null, ev.ticker) : '';
         return `<span class="ag-tk" title="${esc(titulo)}">${logo}${esc(ev.ticker || ev.empresa)}</span>`;
       }).join('');
-      return `<div class="ag-cell">${doDia}</div>`;
+      if (doDia.length <= AG_MAX_TICKERS) return `<div class="ag-cell">${tickers}</div>`;
+      // Duas cópias da lista e translateY(-50%): o ciclo termina exatamente sobre a
+      // cópia, então o loop não tem salto. O atraso negativo amarra a animação ao
+      // relógio — sem ele, o refresh de 30s recria o card e a rolagem volta ao topo.
+      const dur = doDia.length * AG_SEG_POR_TICKER;
+      const fase = -(Date.now() % (dur * 1000));
+      const altura = `calc(${AG_MAX_TICKERS} * (var(--ag-tk-h) + var(--ag-tk-gap)) + 8px)`;
+      return `<div class="ag-cell ag-rolando" style="height:${altura}">
+        <div class="ag-roll" style="animation-duration:${dur}s;animation-delay:${fase}ms">
+          <div class="ag-seg">${tickers}</div>
+          <div class="ag-seg" aria-hidden="true">${tickers}</div>
+        </div>
+      </div>`;
     }).join('');
     body = `<div class="ag-cal" style="grid-template-columns:repeat(${dias.length},minmax(0,1fr))">
       ${cabecalhos}${celulas}

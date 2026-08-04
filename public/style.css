@@ -609,6 +609,10 @@ body.tv-mode .row-values { grid-template-columns: 78px 76px; gap: 10px; }
   display: grid;
   border-top: 1px solid var(--border);
   border-left: 1px solid var(--border);
+  /* Métricas de uma linha de ticker. A altura é fixada (e não deixada por conta da
+     fonte) porque a rolagem das colunas cheias avança em múltiplos exatos dela. */
+  --ag-tk-h: 18px;
+  --ag-tk-gap: 3px;
 }
 
 .ag-head,
@@ -630,7 +634,9 @@ body.tv-mode .row-values { grid-template-columns: 78px 76px; gap: 10px; }
   white-space: nowrap;
 }
 .ag-dm { font-size: 10px; font-weight: 700; color: var(--green-header); }
-.ag-dow { font-size: 8.5px; color: var(--text-muted); }
+/* Azul e em negrito: destaca o dia da semana contra o verde da data, sem precisar de
+   mais tamanho (a largura da coluna é apertada). */
+.ag-dow { font-size: 8.5px; font-weight: 700; color: var(--symbol-color); }
 
 .ag-cell {
   display: flex;
@@ -650,6 +656,39 @@ body.tv-mode .row-values { grid-template-columns: 78px 76px; gap: 10px; }
   white-space: nowrap;
 }
 .ag-tk .row-logo { width: 13px; height: 13px; flex: 0 0 13px; }
+
+/* Dia com mais tickers do que cabe: a coluna ganha altura fixa e a lista rola em loop,
+   em vez de esticar o card inteiro por causa de um único dia cheio. A altura vem inline
+   do app.js, que é quem sabe quantas linhas cabem. */
+.ag-cell.ag-rolando {
+  display: block;
+  overflow: hidden;
+  padding: 4px 2px;
+}
+.ag-roll { animation: ag-roll linear infinite; }
+/* As duas cópias são idênticas e cada linha mede o mesmo, então -50% cai exatamente
+   sobre o início da segunda — o loop não tem emenda visível. */
+@keyframes ag-roll {
+  from { transform: translateY(0); }
+  to { transform: translateY(-50%); }
+}
+/* `flow-root` impede que a margem do último ticker escape da cópia: sem isso cada
+   cópia mede 3px a menos que o passo real e o loop fecha desalinhado. */
+.ag-seg { display: flow-root; }
+.ag-roll .ag-tk {
+  display: flex;
+  justify-content: center;
+  height: var(--ag-tk-h);
+  margin-bottom: var(--ag-tk-gap);
+}
+
+/* Quem pediu menos animação no sistema não vê a rolagem; a coluna vira rolável à mão
+   para nenhum ticker ficar inacessível. */
+@media (prefers-reduced-motion: reduce) {
+  .ag-roll { animation: none; }
+  .ag-cell.ag-rolando { overflow-y: auto; }
+  .ag-roll .ag-seg[aria-hidden] { display: none; }
+}
 
 body.tv-mode .ag-dm { font-size: 10.5px; }
 body.tv-mode .ag-dow { font-size: 8.5px; }
