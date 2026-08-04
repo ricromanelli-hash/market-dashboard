@@ -672,6 +672,23 @@ body.tv-mode .row-values { grid-template-columns: 78px 76px; gap: 10px; }
   margin-bottom: var(--ag-tk-gap);
 }
 
+/* ---- Relógio do painel ---- */
+/* Alturas apertadas de propósito: o card fecha a coluna 2 e precisa caber nos ~90px
+   que sobram até o fim do palco de 1080px. */
+.clock-body { text-align: center; padding: 4px 8px 6px; }
+.clock-time {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.05;
+  color: var(--green-header);
+  font-variant-numeric: tabular-nums; /* sem isso a largura pula a cada segundo */
+}
+.clock-date {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  text-transform: capitalize; /* "terça-feira, 04 de agosto" */
+}
+
 /* ---- Rolagem em loop, usada pela agenda e pelas duas caixas de notícias ---- */
 /* Duas cópias idênticas: -50% cai exatamente sobre o início da segunda e o loop não
    tem emenda visível. Duração e fase são calculadas no app.js, por medição. */
@@ -790,6 +807,10 @@ body.tv-mode .topbar {
   align-items: baseline;
   gap: 14px;
 }
+/* `flex-start` sem gap encosta o horário na esquerda, embaixo da coluna 1 (Maiores
+   Altas e Baixas). Com `space-between` ele era empurrado para a direita da faixa e
+   acabava parando embaixo da coluna 2, onde agora fica o relógio. */
+body.tv-mode .topbar { justify-content: flex-start; gap: 0; }
 body.tv-mode .topbar h1 { display: none; } /* na TV o título não agrega — libera o rodapé */
 /* a lista de fontes não agrega numa TV e custa uma linha do topo */
 body.tv-mode .subtitle { display: none; }

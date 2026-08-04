@@ -379,6 +379,38 @@ function atualizarRelogios() {
   });
 }
 
+// Relógio do painel: preenche o vão que sobra no fim da coluna 2 e dá a hora de
+// referência para os horários de pregão mostrados nos índices. Sempre em horário de
+// Brasília, não no fuso da máquina — o painel é lido como se fosse daqui.
+const relogioHoraFmt = new Intl.DateTimeFormat('pt-BR', {
+  timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+});
+const relogioDataFmt = new Intl.DateTimeFormat('pt-BR', {
+  timeZone: 'America/Sao_Paulo', weekday: 'long', day: '2-digit', month: 'long',
+});
+
+function renderRelogioCard() {
+  const agora = new Date();
+  return `
+    <section class="card clock-card">
+      <div class="card-header">Horário de Brasília</div>
+      <div class="card-body clock-body">
+        <div class="clock-time" id="clockTime">${relogioHoraFmt.format(agora)}</div>
+        <div class="clock-date" id="clockDate">${relogioDataFmt.format(agora)}</div>
+      </div>
+    </section>`;
+}
+
+// Anda de segundo em segundo trocando só o texto — esperar o refresh de 30s deixaria
+// o relógio parado na maior parte do tempo.
+function atualizarRelogioPainel() {
+  const agora = new Date();
+  const hora = document.getElementById('clockTime');
+  const data = document.getElementById('clockDate');
+  if (hora) hora.textContent = relogioHoraFmt.format(agora);
+  if (data) data.textContent = relogioDataFmt.format(agora);
+}
+
 // Card de destaques: poucos números em fonte grande, para leitura à distância na TV.
 const ptsFmt = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
 const brlFmt = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
@@ -756,6 +788,7 @@ function cardBuilders(data) {
     'Brasil': () => renderGroupCard('Brasil', g['Brasil'], renderBrasilRatesRows(data.brasilRates)),
     'IndicesMundiais': () => renderWorldIndicesCard(data.worldIndices),
     'JurosReais': () => renderRealRatesCard(data.realRates),
+    'Relogio': () => renderRelogioCard(),
     'AgendaIBGE': () => renderCalendarCard(data.calendar, TV_MODE ? TV_AGENDA_LIMIT : undefined),
     'AgendaEmpresas': () => renderAgendaEmpresasCard(data.agendaEmpresas),
     'CalendarioEconomico': () => '<div id="calSlot" class="cal-slot"></div>',
@@ -774,7 +807,8 @@ function cardBuilders(data) {
 const TV_LAYOUT = [
   // "Destaques" entra no fim da coluna 1, que tinha ~460px livres — nada acima se move
   ['Estados Unidos', 'Brasil', 'Destaques', 'FearGreed', 'Movers'],
-  ['Commodities', 'IndicesMundiais', 'JurosReais'],
+  // o relógio fecha a coluna 2, no vão que sobrava embaixo dos Juros Reais
+  ['Commodities', 'IndicesMundiais', 'JurosReais', 'Relogio'],
   ['Bancos', 'Energia', 'Seguros', 'Saneamento', 'Telecom', 'Petróleo & Gás', 'AgendaEmpresas'],
   ['Mineração', 'Papel & Celulose', 'Metalurgia & Siderurgia', 'Químicos & Petroquímicos', 'Outros', 'MAG7 (S&P 500)'],
   ['AgendaIBGE', 'CalendarioEconomico', 'NoticiasMacro', 'NoticiasEmpresas'],
@@ -868,3 +902,4 @@ loadData();
 setInterval(loadData, 30_000);
 // os relógios andam sozinhos, sem esperar o refresh de 30s dos dados
 setInterval(atualizarRelogios, 10_000);
+setInterval(atualizarRelogioPainel, 1000);
