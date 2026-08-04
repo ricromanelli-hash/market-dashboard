@@ -765,7 +765,8 @@ body.tv-mode .row-values { grid-template-columns: 78px 76px; gap: 10px; }
    um dia de muitas manchetes empurraria os cards de baixo para fora do palco de 1080px.
    Os valores são a altura que os cards já ocupavam com o corte de 3 e 4 manchetes. */
 body.tv-mode .news-card .card-body { overflow: hidden; }
-body.tv-mode .news-card-macro .card-body { height: 168px; }
+/* 213px = mais uma manchete que os 168px originais (a manchete típica ocupa 43px) */
+body.tv-mode .news-card-macro .card-body { height: 213px; }
 body.tv-mode .news-card-empresas .card-body { height: 211px; }
 
 body.tv-mode .ag-dm { font-size: 10.5px; }
