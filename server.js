@@ -1368,52 +1368,6 @@ app.get('/api/data', (req, res) => {
   res.json({ ...cache, version: VERSION });
 });
 
-// Diagnóstico temporário: mostra a série diária crua que o Yahoo devolve PARA ESTE
-// servidor (o do Render, a partir do IP de datacenter), para entender por que o % do dia
-// sai errado lá e certo no local. Remover depois de resolver.
-app.get('/api/debug-quote/:symbol', async (req, res) => {
-  const symbol = req.params.symbol;
-  const diaUTC = (ts) => new Date(ts * 1000).toISOString().slice(0, 10);
-  const puxa = async (host, params) => {
-    try {
-      const url = `https://${host}/v8/finance/chart/${encodeURIComponent(symbol)}?${params}`;
-      const r = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(20000) });
-      const result = (await r.json())?.chart?.result?.[0];
-      const stamps = result?.timestamp || [];
-      const q = result?.indicators?.quote?.[0] || {};
-      const adj = result?.indicators?.adjclose?.[0]?.adjclose || [];
-      return { httpOk: r.ok, meta: result?.meta, stamps, close: q.close || [], adjclose: adj };
-    } catch (e) { return { erro: e.message }; }
-  };
-  try {
-    // A: diário query1 (o que o app usa hoje)
-    const A = await puxa('query1.finance.yahoo.com', 'interval=1d&range=10d');
-    // B: diário query2 (host alternativo)
-    const B = await puxa('query2.finance.yahoo.com', 'interval=1d&range=10d');
-    // C: intradiário 30m/7d — último fechamento de cada dia (fonte alternativa p/ o dia anterior)
-    const C = await puxa('query1.finance.yahoo.com', 'interval=30m&range=7d');
-    const barrasDiarias = (X) => (X.stamps || []).map((ts, i) => ({
-      dia: diaUTC(ts), close: X.close?.[i] ?? null, adj: X.adjclose?.[i] ?? null,
-    }));
-    // do intradiário: agrupa por dia e pega o último close não-nulo de cada
-    const porDiaIntra = {};
-    (C.stamps || []).forEach((ts, i) => {
-      const c = C.close?.[i];
-      if (typeof c === 'number') porDiaIntra[diaUTC(ts)] = c;
-    });
-    res.json({
-      version: VERSION, symbol,
-      price: A.meta?.regularMarketPrice,
-      regularMarketTime: A.meta?.regularMarketTime ? new Date(A.meta.regularMarketTime * 1000).toISOString() : null,
-      A_query1_diario: { httpOk: A.httpOk, bars: barrasDiarias(A) },
-      B_query2_diario: { httpOk: B.httpOk, bars: barrasDiarias(B) },
-      C_intradiario_ultimoDeCadaDia: { httpOk: C.httpOk, porDia: porDiaIntra },
-    });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
 app.listen(PORT, async () => {
   console.log(`Market dashboard rodando em http://localhost:${PORT}`);
   await Promise.allSettled([refreshMarketData(), refreshSlowData(), refreshAgendaEmpresas()]);
