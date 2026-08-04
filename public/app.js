@@ -362,7 +362,8 @@ function estadoBolsa(b) {
 function relogioIndice(it) {
   if (!it.tz) return '';
   const { hhmm, estado } = estadoBolsa(it);
-  return `<span class="idx-hora ${estado}" data-tz="${it.tz}" data-abre="${it.abre}" data-fecha="${it.fecha}" title="pregão ${it.abre}–${it.fecha} (hora local)">${hhmm}</span>`;
+  // bolinha antes da hora: verde = aberta, laranja = perto do fechamento, cinza = fechada
+  return `<span class="idx-hora ${estado}" data-tz="${it.tz}" data-abre="${it.abre}" data-fecha="${it.fecha}" title="pregão ${it.abre}–${it.fecha} (hora local)"><span class="idx-dot"></span><span class="idx-hora-txt">${hhmm}</span></span>`;
 }
 
 // Atualiza só os relógios, sem refazer o painel inteiro.
@@ -371,7 +372,8 @@ function atualizarRelogios() {
     const { hhmm, estado } = estadoBolsa({
       tz: el.dataset.tz, abre: el.dataset.abre, fecha: el.dataset.fecha,
     });
-    el.textContent = hhmm;
+    const txt = el.querySelector('.idx-hora-txt');
+    if (txt) txt.textContent = hhmm; // só o texto: não recria a bolinha
     el.classList.remove('aberta', 'fechando', 'fechada');
     el.classList.add(estado);
   });

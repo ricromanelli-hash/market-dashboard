@@ -39,7 +39,7 @@ body.tv-mode .pair-group > .card { margin-bottom: 10px; }
    linha se dimensionava pelo próprio conteúdo e as colunas ficavam desalinhadas */
 .row.idx-row {
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) 34px 44px 66px;
+  grid-template-columns: 18px minmax(0, 1fr) 46px 44px 66px;
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
@@ -408,8 +408,10 @@ body.tv-mode .pre-tag { font-size: 9px; }
 /* Hora local da bolsa, na própria linha do índice.
    verde = pregão aberto · laranja = perto do fechamento · cinza = fechado */
 .idx-hora {
-  flex: 0 0 34px;
-  text-align: right;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
   font-size: 10.5px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -418,7 +420,19 @@ body.tv-mode .pre-tag { font-size: 9px; }
 }
 .idx-hora.aberta { color: var(--green-up); }
 .idx-hora.fechando { color: #ef6c00; }
-body.tv-mode .idx-hora { flex-basis: 32px; font-size: 10px; }
+body.tv-mode .idx-hora { font-size: 10px; }
+
+/* bolinha de status do pregão, à esquerda da hora */
+.idx-dot {
+  flex: 0 0 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gray-flat); /* fechada */
+}
+.idx-hora.aberta .idx-dot { background: var(--green-up); }
+.idx-hora.fechando .idx-dot { background: #ef6c00; }
+body.tv-mode .idx-dot { flex-basis: 7px; width: 7px; height: 7px; }
 
 /* ---- Medidor do Fear & Greed ---- */
 /* dois medidores lado a lado (EUA e Brasil) — cabem na altura de um só */
@@ -763,7 +777,7 @@ body.tv-mode .tv-col > *:last-child { margin-bottom: 0; }
 
 /* índices mundiais compactos na TV: valor e % na mesma linha do nome */
 body.tv-mode .row.idx-row {
-  grid-template-columns: 18px minmax(0, 1fr) 32px 32px 92px;
+  grid-template-columns: 18px minmax(0, 1fr) 44px 32px 92px;
   padding: 3px 8px; gap: 4px; line-height: 1.45;
 }
 body.tv-mode .idx-region { font-size: 9.5px; padding: 2px 8px; }
