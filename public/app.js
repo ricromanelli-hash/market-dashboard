@@ -449,10 +449,23 @@ function renderRealRatesCard(rows) {
     </section>`;
 }
 
+// Linha de ação: a que ganha logo e coluna de 12m (B3 pelo sufixo .SA, EUA pelo `icon`).
+const ehAcao = (it) => Boolean(it.icon) || String(it.symbol || '').endsWith('.SA');
+
+// Cards de ações (setores da B3 e MAG7) saem ordenados pela variação de 12 meses, da
+// maior alta para a maior baixa. Índices, moedas e commodities não têm essa coluna e
+// mantêm a ordem definida no backend.
+function ordenarPor12m(items) {
+  if (!items.length || !items.every(ehAcao)) return items;
+  const valor = (it) => (typeof it.chg12m === 'number' ? it.chg12m : -Infinity); // sem dado vai pro fim
+  return [...items].sort((a, b) => valor(b) - valor(a));
+}
+
 function renderGroupCard(title, items, extraRows = '') {
   // `hidden`: item que o backend busca para outro card (Destaques) e que não deve
   // aparecer como linha aqui.
-  const rows = (items || []).filter((it) => !it.hidden).map(renderQuoteRow).join('');
+  const visiveis = (items || []).filter((it) => !it.hidden);
+  const rows = ordenarPor12m(visiveis).map(renderQuoteRow).join('');
   const body = (rows || '<p class="row-unavailable" style="padding:12px">carregando…</p>') + extraRows;
   return `
     <section class="card">
