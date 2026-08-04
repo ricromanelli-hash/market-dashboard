@@ -1,9 +1,18 @@
 const express = require('express');
 const path = require('path');
+const { execSync } = require('child_process');
 const { XMLParser } = require('fast-xml-parser');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Commit publicado, exibido na tela para saber qual versão está no ar. No Render vem da
+// variável RENDER_GIT_COMMIT (injetada em cada deploy); local, lê o HEAD do git.
+const VERSION = (() => {
+  if (process.env.RENDER_GIT_COMMIT) return process.env.RENDER_GIT_COMMIT.slice(0, 7);
+  try { return execSync('git rev-parse --short HEAD', { cwd: __dirname }).toString().trim(); }
+  catch { return 'dev'; }
+})();
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) MarketDashboard/1.0';
 
@@ -1326,7 +1335,7 @@ async function refreshSlowData() {
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/data', (req, res) => {
-  res.json(cache);
+  res.json({ ...cache, version: VERSION });
 });
 
 app.listen(PORT, async () => {

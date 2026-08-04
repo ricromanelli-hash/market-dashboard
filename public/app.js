@@ -735,7 +735,10 @@ function render(data) {
   positionCalWidget();
 
   if (data.updatedAt) {
-    updatedAtEl.textContent = `Atualizado às ${timeFmt.format(new Date(data.updatedAt))}`;
+    // hash do commit no ar, logo após o horário — serve para conferir na TV se o deploy
+    // mais recente já subiu.
+    const ver = data.version ? ` · ${data.version}` : '';
+    updatedAtEl.textContent = `Atualizado às ${timeFmt.format(new Date(data.updatedAt))}${ver}`;
   }
 }
 
