@@ -385,14 +385,14 @@ function atualizarRelogios() {
 const relogioHoraFmt = new Intl.DateTimeFormat('pt-BR', {
   timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
 });
-// "Terça" (o dia da semana cheio, sem o "-feira") e "04/AGO/2026".
+// "Terça-feira" (vai no cabeçalho, em maiúsculas via CSS) e "04/AGO".
 const relogioDiaSemanaFmt = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long' });
 const relogioDataPartes = new Intl.DateTimeFormat('pt-BR', {
   timeZone: 'America/Sao_Paulo', day: '2-digit', month: 'short',
 });
 
 function diaDaSemana(agora) {
-  return relogioDiaSemanaFmt.format(agora).replace(/-feira$/, '');
+  return relogioDiaSemanaFmt.format(agora);
 }
 
 // O formato 'short' do mês vem como "ago." (com ponto); aqui vira "04/AGO".
@@ -448,9 +448,12 @@ function renderRelogioCard(clima) {
     : '<span class="temp-num">—</span>';
   return `
     <section class="card clock-card">
-      <div class="card-header">Horário de Brasília</div>
+      <div class="card-header clock-header">
+        <span>Horário de Brasília</span>
+        <span class="clock-sep">|</span>
+        <span class="clock-dow" id="clockDow">${diaDaSemana(agora)}</span>
+      </div>
       <div class="card-body clock-body">
-        <div class="clock-dow" id="clockDow">${diaDaSemana(agora)}</div>
         <div class="clock-linha">
           <span class="clock-time" id="clockTime">${relogioHoraFmt.format(agora)}</span>
           <span class="clock-date" id="clockDate">${dataCurta(agora)}</span>

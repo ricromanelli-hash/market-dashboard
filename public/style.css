@@ -675,35 +675,36 @@ body.tv-mode .row-values { grid-template-columns: 78px 76px; gap: 10px; }
 /* ---- Relógio do painel ---- */
 /* Alturas apertadas de propósito: o card fecha a coluna 2 e precisa caber nos ~90px
    que sobram até o fim do palco de 1080px. */
-.clock-body { text-align: center; padding: 3px 8px 6px; }
-.clock-dow {
-  font-size: 13px;
-  font-weight: 700;
-  text-transform: capitalize; /* "Terça" */
-  color: var(--text);
-}
+.clock-body { text-align: center; padding: 6px 6px 8px; }
+/* dia da semana ao lado do título, no cabeçalho */
+.clock-header { display: flex; align-items: baseline; justify-content: center; gap: 7px; }
+.clock-sep { opacity: 0.45; }
+/* menor que o título: "SEGUNDA-FEIRA" é o mais longo e precisa caber na largura do card */
+.clock-dow { text-transform: uppercase; font-size: 12px; }
 /* hora · data · temperatura na mesma linha, a data centrada como na planilha */
 .clock-linha {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
+/* Tamanhos no limite da largura do card: a soma de hora + data + temperatura tem de
+   caber nos 320px úteis da linha, senão um dos três é cortado. */
 .clock-time {
-  font-size: 22px;
+  font-size: 28px;
   font-weight: 700;
   line-height: 1.1;
   color: var(--green-header);
   font-variant-numeric: tabular-nums; /* sem isso a largura pula a cada segundo */
 }
 .clock-date {
-  font-size: 19px;
+  font-size: 23px;
   font-weight: 700;
   color: var(--red-down);
   font-variant-numeric: tabular-nums;
   border: 1px solid var(--border);
   border-radius: 4px;
-  padding: 1px 6px;
+  padding: 1px 5px;
 }
 /* ícone do tempo + número grande + unidade pequena erguida, como num app de clima */
 .clock-temp {
@@ -713,16 +714,16 @@ body.tv-mode .row-values { grid-template-columns: 78px 76px; gap: 10px; }
   gap: 4px;
   white-space: nowrap;
 }
-.temp-icon { width: 24px; height: 26px; flex: 0 0 24px; }
+.temp-icon { width: 30px; height: 32px; flex: 0 0 30px; }
 .temp-num {
-  font-size: 22px;
+  font-size: 28px;
   font-weight: 700;
   color: var(--text);
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
 .temp-unit {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-muted);
   align-self: flex-start;
