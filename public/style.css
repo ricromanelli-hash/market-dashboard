@@ -745,6 +745,13 @@ body.tv-mode .row-values { grid-template-columns: 78px 76px; gap: 10px; }
 .roll-parado { animation: none; }
 .roll-parado .roll-seg[aria-hidden] { display: none; }
 
+/* Mouse em cima: a lista para e volta ao topo, mostrando o item mais recente (na
+   agenda, o primeiro ticker do dia). `animation: none` faz as duas coisas de uma vez —
+   zera o transform e interrompe. Ao tirar o mouse, o app.js recomeça a contagem dali,
+   para a lista não saltar para a posição que o relógio marcaria. */
+.card-body:hover > .roll,
+.ag-cell:hover > .roll { animation: none; }
+
 /* Quem pediu menos animação no sistema não vê a rolagem; a caixa vira rolável à mão
    para nenhum item ficar inacessível. */
 @media (prefers-reduced-motion: reduce) {

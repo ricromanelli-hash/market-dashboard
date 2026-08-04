@@ -612,32 +612,49 @@ function renderCpiRow(cpi) {
 // segunda — o loop não tem emenda visível.
 const ROLL_PX_S = 7; // velocidade, bem lenta: uma manchete leva ~7s para subir
 
-function emLoop(html) {
+// `chave` identifica a lista entre um render e outro (os elementos são recriados a
+// cada 30s), para a rolagem continuar de onde estava — ver inicioRoll.
+function emLoop(html, chave = '') {
   if (!html) return html;
-  return `<div class="roll">
+  return `<div class="roll" data-roll="${chave}">
     <div class="roll-seg">${html}</div>
     <div class="roll-seg" aria-hidden="true">${html}</div>
   </div>`;
 }
 
+// Instante em que cada rolagem começou. Sem entrada na tabela vale 0, ou seja, a fase
+// vem do relógio — é o que faz o refresh de 30s não jogar a lista de volta ao topo.
+// Tirar o mouse de cima regrava o instante, e aí ela recomeça do topo (ver mouseleave).
+const inicioRoll = new Map();
+
 // Roda depois de cada render: mede a cópia contra o espaço visível e só anima o que
 // realmente transborda (nos cards sem altura fixa, a segunda cópia fica escondida).
-// O atraso negativo amarra a fase ao relógio — sem ele o refresh de 30s, que recria os
-// cards, faria toda rolagem voltar ao topo.
 function ativarRolagens() {
   document.querySelectorAll('.roll').forEach((roll) => {
     const seg = roll.querySelector('.roll-seg');
     if (!seg) return;
-    const cabe = seg.offsetHeight <= roll.parentElement.clientHeight;
+    const caixa = roll.parentElement;
+    const cabe = seg.offsetHeight <= caixa.clientHeight;
     roll.classList.toggle('roll-parado', cabe);
     if (cabe) {
       roll.style.animationDuration = '';
       roll.style.animationDelay = '';
       return;
     }
+    // Com o mouse em cima a lista para no topo (CSS); ao sair, recomeça dali em vez de
+    // saltar para onde o relógio mandaria. `dataset` evita empilhar o mesmo listener a
+    // cada chamada — a caixa sobrevive entre renders, só o conteúdo é recriado.
+    const chave = roll.dataset.roll || '';
+    if (!caixa.dataset.rollHover) {
+      caixa.dataset.rollHover = '1';
+      caixa.addEventListener('mouseleave', () => {
+        inicioRoll.set(chave, Date.now());
+        ativarRolagens();
+      });
+    }
     const durMs = Math.round((seg.offsetHeight / ROLL_PX_S) * 1000);
     roll.style.animationDuration = `${durMs}ms`;
-    roll.style.animationDelay = `-${Date.now() % durMs}ms`;
+    roll.style.animationDelay = `-${(Date.now() - (inicioRoll.get(chave) || 0)) % durMs}ms`;
   });
 }
 
@@ -667,7 +684,7 @@ function renderNewsCard(news, title = 'Notícias') {
   return `
     <section class="card news-card news-card-macro">
       <div class="card-header">${title}</div>
-      <div class="card-body">${emLoop(renderNewsItems(noticiasRecentes(news)))}</div>
+      <div class="card-body">${emLoop(renderNewsItems(noticiasRecentes(news)), 'noticias-macro')}</div>
     </section>`;
 }
 
@@ -687,7 +704,7 @@ function renderMainNewsCard(data) {
           <button data-newsfilter="company" class="${showCompany ? 'active' : ''}">Minhas empresas</button>
         </span>
       </div>
-      <div class="card-body">${emLoop(renderNewsItems(list, emptyMsg))}</div>
+      <div class="card-body">${emLoop(renderNewsItems(list, emptyMsg), 'noticias-empresas')}</div>
     </section>`;
 }
 
@@ -775,7 +792,7 @@ function renderAgendaEmpresasCard(agenda) {
       if (doDia.length <= AG_MAX_TICKERS) return `<div class="ag-cell">${tickers}</div>`;
       // altura de AG_MAX_TICKERS linhas; o excedente sobe em loop (ver emLoop)
       const altura = `calc(${AG_MAX_TICKERS} * (var(--ag-tk-h) + var(--ag-tk-gap)) + 8px)`;
-      return `<div class="ag-cell ag-rolando" style="height:${altura}">${emLoop(tickers)}</div>`;
+      return `<div class="ag-cell ag-rolando" style="height:${altura}">${emLoop(tickers, `agenda-${iso}`)}</div>`;
     }).join('');
     body = `<div class="ag-cal" style="grid-template-columns:repeat(${dias.length},minmax(0,1fr))">
       ${cabecalhos}${celulas}
