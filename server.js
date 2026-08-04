@@ -1338,6 +1338,33 @@ app.get('/api/data', (req, res) => {
   res.json({ ...cache, version: VERSION });
 });
 
+// Diagnóstico temporário: mostra a série diária crua que o Yahoo devolve PARA ESTE
+// servidor (o do Render, a partir do IP de datacenter), para entender por que o % do dia
+// sai errado lá e certo no local. Remover depois de resolver.
+app.get('/api/debug-quote/:symbol', async (req, res) => {
+  try {
+    const symbol = req.params.symbol;
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=10d`;
+    const r = await fetch(url, { headers: { 'User-Agent': UA } });
+    const result = (await r.json())?.chart?.result?.[0];
+    const stamps = result?.timestamp || [];
+    const closes = result?.indicators?.quote?.[0]?.close || [];
+    const bars = stamps.map((ts, i) => ({ dia: new Date(ts * 1000).toISOString().slice(0, 10), close: closes[i] }));
+    res.json({
+      version: VERSION,
+      symbol,
+      httpOk: r.ok,
+      regularMarketPrice: result?.meta?.regularMarketPrice,
+      regularMarketTime: result?.meta?.regularMarketTime
+        ? new Date(result.meta.regularMarketTime * 1000).toISOString() : null,
+      chartPreviousClose: result?.meta?.chartPreviousClose,
+      bars,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.listen(PORT, async () => {
   console.log(`Market dashboard rodando em http://localhost:${PORT}`);
   await Promise.allSettled([refreshMarketData(), refreshSlowData(), refreshAgendaEmpresas()]);
