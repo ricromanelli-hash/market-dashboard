@@ -388,25 +388,64 @@ const relogioHoraFmt = new Intl.DateTimeFormat('pt-BR', {
 // "Terça" (o dia da semana cheio, sem o "-feira") e "04/AGO/2026".
 const relogioDiaSemanaFmt = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long' });
 const relogioDataPartes = new Intl.DateTimeFormat('pt-BR', {
-  timeZone: 'America/Sao_Paulo', day: '2-digit', month: 'short', year: 'numeric',
+  timeZone: 'America/Sao_Paulo', day: '2-digit', month: 'short',
 });
 
 function diaDaSemana(agora) {
   return relogioDiaSemanaFmt.format(agora).replace(/-feira$/, '');
 }
 
-// O formato 'short' do mês vem como "ago." (com ponto); aqui vira "AGO".
+// O formato 'short' do mês vem como "ago." (com ponto); aqui vira "04/AGO".
 function dataCurta(agora) {
   const p = relogioDataPartes.formatToParts(agora);
   const val = (t) => p.find((x) => x.type === t)?.value || '';
-  return `${val('day')}/${val('month').replace('.', '').toUpperCase()}/${val('year')}`;
+  return `${val('day')}/${val('month').replace('.', '').toUpperCase()}`;
+}
+
+// Ícone do tempo em SVG. Emoji de clima não renderiza igual em TV/Windows, e uma
+// imagem externa dependeria de mais um serviço — aqui o desenho vem no próprio HTML.
+// O gradiente imita o volume da nuvem do modelo (claro em cima, cinza embaixo).
+function iconeClima(cond, dia) {
+  const nuvem = '<path d="M7.2 19.2a4.4 4.4 0 0 1-.4-8.78 6 6 0 0 1 11.44 1.63 3.7 3.7 0 0 1-.84 7.15z" fill="url(#gNuvem)" stroke="#a8b2bc" stroke-width=".5"/>';
+  const sol = (cx, cy, r) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#f6b323"/>`
+    + [0, 45, 90, 135, 180, 225, 270, 315].map((a) => {
+      const rad = (a * Math.PI) / 180;
+      const x1 = cx + Math.cos(rad) * (r + 1.6), y1 = cy + Math.sin(rad) * (r + 1.6);
+      const x2 = cx + Math.cos(rad) * (r + 3.4), y2 = cy + Math.sin(rad) * (r + 3.4);
+      return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#f6b323" stroke-width="1.4" stroke-linecap="round"/>`;
+    }).join('');
+  const lua = '<path d="M16.8 14.6A6.4 6.4 0 0 1 9.4 7.2a6.4 6.4 0 1 0 7.4 7.4z" fill="#e8c34a"/>';
+  const gotas = '<g stroke="#4a86c8" stroke-width="1.6" stroke-linecap="round">'
+    + '<line x1="9.5" y1="20" x2="8.6" y2="22.4"/><line x1="13" y1="20" x2="12.1" y2="22.4"/>'
+    + '<line x1="16.5" y1="20" x2="15.6" y2="22.4"/></g>';
+  const raio = '<path d="M13.2 19.4h3.1l-4.6 5.1 1.2-3.4h-2.6l3.4-4.3z" fill="#f6b323"/>';
+  const flocos = '<g fill="#7fb3e0"><circle cx="9.6" cy="21.4" r="1"/><circle cx="13" cy="21.4" r="1"/><circle cx="16.4" cy="21.4" r="1"/></g>';
+  const nevoa = '<g stroke="#a8b2bc" stroke-width="1.5" stroke-linecap="round">'
+    + '<line x1="7" y1="21" x2="17" y2="21"/><line x1="9" y1="23.4" x2="15" y2="23.4"/></g>';
+  const corpo = {
+    limpo: dia ? sol(12, 12, 5.2) : lua,
+    parcial: (dia ? sol(8.4, 8.4, 3.6) : lua) + nuvem,
+    nublado: nuvem,
+    neblina: nuvem + nevoa,
+    chuva: nuvem + gotas,
+    neve: nuvem + flocos,
+    tempestade: nuvem + raio,
+  }[cond] || nuvem;
+  return `<svg class="temp-icon" viewBox="0 0 24 26" aria-hidden="true">
+    <defs><linearGradient id="gNuvem" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fdfefe"/><stop offset="1" stop-color="#b4bec8"/>
+    </linearGradient></defs>${corpo}</svg>`;
 }
 
 function renderRelogioCard(clima) {
   const agora = new Date();
-  const temp = typeof clima?.temp === 'number'
-    ? `${clima.temp} Graus`
-    : '—';
+  const temTemp = typeof clima?.temp === 'number';
+  const titulo = temTemp
+    ? `${clima.cidade} · ${clima.texto}`
+    : 'temperatura indisponível';
+  const temp = temTemp
+    ? `${iconeClima(clima.cond, clima.dia)}<span class="temp-num">${clima.temp}</span><span class="temp-unit">°C</span>`
+    : '<span class="temp-num">—</span>';
   return `
     <section class="card clock-card">
       <div class="card-header">Horário de Brasília</div>
@@ -415,7 +454,7 @@ function renderRelogioCard(clima) {
         <div class="clock-linha">
           <span class="clock-time" id="clockTime">${relogioHoraFmt.format(agora)}</span>
           <span class="clock-date" id="clockDate">${dataCurta(agora)}</span>
-          <span class="clock-temp" title="${clima?.cidade ? 'temperatura em ' + clima.cidade : 'temperatura indisponível'}">${temp}</span>
+          <span class="clock-temp" title="${esc(titulo)}">${temp}</span>
         </div>
       </div>
     </section>`;

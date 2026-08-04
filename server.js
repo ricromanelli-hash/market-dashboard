@@ -833,14 +833,37 @@ async function refreshFearGreed() {
 
 // Temperatura atual de São Paulo, no card do relógio. Open-Meteo é aberta e sem
 // cadastro; `current` já devolve a leitura mais recente, então não há série para tratar.
+// `weather_code` (padrão WMO) e `is_day` escolhem o ícone no front.
 const CLIMA_URL = 'https://api.open-meteo.com/v1/forecast'
-  + '?latitude=-23.5505&longitude=-46.6333&current=temperature_2m&timezone=America%2FSao_Paulo';
+  + '?latitude=-23.5505&longitude=-46.6333&current=temperature_2m,weather_code,is_day'
+  + '&timezone=America%2FSao_Paulo';
+
+// Faixas de código WMO agrupadas no que muda o desenho do ícone.
+const CONDICOES = [
+  { ate: 0, cond: 'limpo', texto: 'céu limpo' },
+  { ate: 2, cond: 'parcial', texto: 'parcialmente nublado' },
+  { ate: 3, cond: 'nublado', texto: 'nublado' },
+  { ate: 48, cond: 'neblina', texto: 'neblina' },
+  { ate: 67, cond: 'chuva', texto: 'chuva' },
+  { ate: 77, cond: 'neve', texto: 'neve' },
+  { ate: 82, cond: 'chuva', texto: 'pancadas de chuva' },
+  { ate: 86, cond: 'neve', texto: 'neve' },
+  { ate: 99, cond: 'tempestade', texto: 'tempestade' },
+];
 
 async function refreshClima() {
   const json = await fetchJsonWithRetry(CLIMA_URL, 'Open-Meteo (temperatura)', 2, 15000);
   const temp = Number(json?.current?.temperature_2m);
   if (!Number.isFinite(temp)) throw new Error('Open-Meteo: sem temperatura');
-  cache.clima = { temp: Math.round(temp), cidade: 'São Paulo' };
+  const code = Number(json?.current?.weather_code);
+  const faixa = CONDICOES.find((c) => code <= c.ate) || CONDICOES[CONDICOES.length - 1];
+  cache.clima = {
+    temp: Math.round(temp),
+    cond: faixa.cond,
+    texto: faixa.texto,
+    dia: json?.current?.is_day !== 0,
+    cidade: 'São Paulo',
+  };
 }
 
 // PIB anual (crescimento %) dos 8 países, via World Bank Data360

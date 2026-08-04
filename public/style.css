@@ -705,11 +705,28 @@ body.tv-mode .row-values { grid-template-columns: 78px 76px; gap: 10px; }
   border-radius: 4px;
   padding: 1px 6px;
 }
+/* ícone do tempo + número grande + unidade pequena erguida, como num app de clima */
 .clock-temp {
-  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  white-space: nowrap;
+}
+.temp-icon { width: 24px; height: 26px; flex: 0 0 24px; }
+.temp-num {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.temp-unit {
+  font-size: 10px;
   font-weight: 600;
   color: var(--text-muted);
-  white-space: nowrap;
+  align-self: flex-start;
+  margin-top: 1px;
 }
 
 /* ---- Rolagem em loop, usada pela agenda e pelas duas caixas de notícias ---- */
