@@ -6,12 +6,14 @@ const TICKER = (params.get('ticker') || '').toUpperCase().replace(/[^A-Z0-9]/g, 
 
 const tituloEl = document.getElementById('empTitulo');
 const subEl = document.getElementById('empSub');
+const abasEl = document.getElementById('empAbas');
 const controlesEl = document.getElementById('empControles');
 const balaoEl = document.getElementById('empBalao');
 const conteudoEl = document.getElementById('empConteudo');
 
 const fmtMi = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
 const fmt1 = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const fmt2 = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]
@@ -19,7 +21,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => (
 
 // Cada coluna sabe se dá para colorir por sinal e como se formata. `grupo` só pinta o
 // cabeçalho, para separar resultado, balanço e caixa de relance.
-const COLUNAS = [
+const COLUNAS_KPI = [
   { chave: 'periodo', rotulo: 'Ano', tipo: 'texto', grupo: 'ano' },
   { chave: 'receita', rotulo: 'Receita Líq', tipo: 'mi', grupo: 'resultado' },
   { chave: 'ebitda', rotulo: 'EBITDA', tipo: 'mi', grupo: 'resultado' },
@@ -49,9 +51,86 @@ const COLUNAS = [
   { chave: 'dy', rotulo: 'DY', tipo: 'pct1', grupo: 'provento' },
 ];
 
+// Aba de EVA: mesma ordem da tabela do app em Flutter, sem as colunas que lá apareciam
+// repetidas (Despesas Juros, WACC, Margem EBIT/EBT/Líquida saíam duas vezes).
+const COLUNAS_EVA = [
+  { chave: 'periodo', rotulo: 'Ano', tipo: 'texto', grupo: 'ano' },
+  { chave: 'receita', rotulo: 'Receita Líq', tipo: 'mi', grupo: 'resultado' },
+  { chave: 'cpv', rotulo: 'CPV', tipo: 'mi', grupo: 'custo' },
+  { chave: 'lucroBruto', rotulo: 'Lucro Bruto', tipo: 'mi', grupo: 'resultado' },
+  { chave: 'margemBruta', rotulo: 'Mrg Bruta', tipo: 'pct1', grupo: 'resultado' },
+  { chave: 'dvga', rotulo: 'DVGA', tipo: 'mi', grupo: 'custo' },
+  { chave: 'ebitda', rotulo: 'EBITDA', tipo: 'mi', grupo: 'resultado' },
+  { chave: 'da', rotulo: 'D&A', tipo: 'mi', grupo: 'custo' },
+  { chave: 'margemEbitda', rotulo: 'Mrg EBITDA', tipo: 'pct1', grupo: 'resultado' },
+  { chave: 'ebit', rotulo: 'EBIT', tipo: 'mi', grupo: 'resultado' },
+  { chave: 'margemEbit', rotulo: 'Mrg EBIT', tipo: 'pct1', grupo: 'resultado' },
+  { chave: 'resFin', rotulo: 'Res Fin', tipo: 'mi', grupo: 'custo' },
+  { chave: 'varCambial', rotulo: 'Var Cambial', tipo: 'mi', grupo: 'custo' },
+  { chave: 'despJuros', rotulo: 'Desp Juros', tipo: 'mi', grupo: 'custo' },
+  { chave: 'despJurosPct', rotulo: 'Desp Juros %', tipo: 'pct1', grupo: 'custo' },
+  { chave: 'ebt', rotulo: 'EBT', tipo: 'mi', grupo: 'resultado' },
+  { chave: 'margemEbt', rotulo: 'Mrg EBT', tipo: 'pct1', grupo: 'resultado' },
+  { chave: 'impostos', rotulo: 'Impostos', tipo: 'mi', grupo: 'custo' },
+  { chave: 'impostosPct', rotulo: 'Impostos %', tipo: 'pct1', grupo: 'custo' },
+  { chave: 'lucro', rotulo: 'Lucro Líq', tipo: 'mi', grupo: 'resultado' },
+  { chave: 'margemLiquida', rotulo: 'Mrg Líq', tipo: 'pct1', grupo: 'resultado' },
+  { chave: 'capInvestido', rotulo: 'Cap Investido', tipo: 'mi', grupo: 'eva' },
+  { chave: 'nopat', rotulo: 'NOPAT', tipo: 'mi', grupo: 'eva' },
+  { chave: 'encargos', rotulo: 'Encargos', tipo: 'mi', grupo: 'eva' },
+  { chave: 'eva', rotulo: 'EVA', tipo: 'mi', grupo: 'eva' },
+  { chave: 'roic', rotulo: 'ROIC', tipo: 'pct1', grupo: 'eva' },
+  { chave: 'wacc', rotulo: 'WACC', tipo: 'pct1', grupo: 'eva' },
+  { chave: 'spread', rotulo: 'R x W', tipo: 'pct1', grupo: 'eva' },
+  { chave: 'margemNopat', rotulo: 'Mrg Operac', tipo: 'pct1', grupo: 'eva' },
+  { chave: 'evaFco', rotulo: 'FCO', tipo: 'mi', grupo: 'caixa' },
+  { chave: 'evaFcf', rotulo: 'FCF', tipo: 'mi', grupo: 'caixa' },
+  { chave: 'invCapInv', rotulo: 'Inv Cap Inv', tipo: 'mi', grupo: 'caixa' },
+  { chave: 'capGiro', rotulo: 'Cap Giro', tipo: 'mi', grupo: 'caixa' },
+  { chave: 'anc', rotulo: 'ANC', tipo: 'mi', grupo: 'caixa' },
+  { chave: 'mva', rotulo: 'MVA', tipo: 'mi', grupo: 'eva' },
+  { chave: 'evaPorAcao', rotulo: 'EVA/Ação', tipo: 'dec', grupo: 'eva' },
+  { chave: 'divida', rotulo: 'Dívida Bruta', tipo: 'mi', grupo: 'divida' },
+  { chave: 'dividaCp', rotulo: 'Curto Prazo %', tipo: 'pct1', grupo: 'divida' },
+  { chave: 'dividaLp', rotulo: 'Longo Prazo %', tipo: 'pct1', grupo: 'divida' },
+  { chave: 'caixaEquiv', rotulo: 'Caixa', tipo: 'mi', grupo: 'divida' },
+  { chave: 'dividaLiquida', rotulo: 'Dívida Líq', tipo: 'mi', grupo: 'divida' },
+  { chave: 'dlEbit', rotulo: 'DL/EBIT', tipo: 'x', grupo: 'divida' },
+  { chave: 'dlEbitda', rotulo: 'DL/EBITDA', tipo: 'x', grupo: 'divida' },
+  { chave: 'percCp', rotulo: 'Cap Próprio %', tipo: 'pct1', grupo: 'divida' },
+  { chave: 'percCt', rotulo: 'Cap Terceiro %', tipo: 'pct1', grupo: 'divida' },
+  { chave: 'custoCp', rotulo: 'Custo CP 10a', tipo: 'pct1', grupo: 'divida' },
+  { chave: 'custoCt', rotulo: 'Custo CT', tipo: 'pct1', grupo: 'divida' },
+  { chave: 'beta', rotulo: 'Beta', tipo: 'dec', grupo: 'divida' },
+  { chave: 'roe', rotulo: 'ROE', tipo: 'pct1', grupo: 'balanco' },
+  { chave: 'roeAjustado', rotulo: 'ROE Ajust', tipo: 'pct1', grupo: 'balanco' },
+  { chave: 'patrimonio', rotulo: 'Patrimônio', tipo: 'mi', grupo: 'balanco' },
+  { chave: 'txCrescPl', rotulo: 'Cresc PL', tipo: 'pct1', grupo: 'balanco' },
+  { chave: 'txCrescRl', rotulo: 'Cresc RL', tipo: 'pct1', grupo: 'balanco' },
+  { chave: 'capexSobreLl', rotulo: 'Capex/LL', tipo: 'pct1', grupo: 'balanco' },
+  { chave: 'lucro10y', rotulo: 'LL 10a Médio', tipo: 'mi', grupo: 'balanco' },
+  { chave: 'cpvSobreLb', rotulo: 'CPV/LB', tipo: 'pct1', grupo: 'balanco' },
+  { chave: 'dvgaSobreLb', rotulo: 'DVGA/LB', tipo: 'pct1', grupo: 'balanco' },
+  { chave: 'jurosSobreEbit', rotulo: 'Juros/EBIT', tipo: 'pct1', grupo: 'balanco' },
+  { chave: 'margemBruta10y', rotulo: 'Mrg Bruta 10a', tipo: 'pct1', grupo: 'balanco' },
+  { chave: 'valorMercado', rotulo: 'Valor Mercado', tipo: 'mi', grupo: 'mercado' },
+  { chave: 'valorFirma', rotulo: 'Valor Firma', tipo: 'mi', grupo: 'mercado' },
+  { chave: 'papeis', rotulo: 'Papéis (mi)', tipo: 'mi', grupo: 'mercado' },
+  { chave: 'cotacaoOn', rotulo: 'Cotação ON', tipo: 'dec', grupo: 'mercado' },
+  { chave: 'cotacaoPn', rotulo: 'Cotação PN', tipo: 'dec', grupo: 'mercado' },
+];
+
+const ABAS = [
+  { id: 'kpi', rotulo: 'Indicadores', colunas: COLUNAS_KPI },
+  { id: 'eva', rotulo: 'EVA', colunas: COLUNAS_EVA },
+];
+
 const MS_ANO = 365.25 * 24 * 60 * 60 * 1000;
 
 let DADOS = null; // guardado para recalcular a variação sem refazer o fetch
+let ABA = ABAS[0];
+
+const COLUNAS = () => ABA.colunas;
 
 function formata(valor, tipo) {
   if (tipo === 'texto') return esc(valor);
@@ -60,6 +139,7 @@ function formata(valor, tipo) {
   if (tipo === 'pct0') return `${Math.round(valor)}%`;
   if (tipo === 'pct1') return `${fmt1.format(valor)}%`;
   if (tipo === 'x') return fmt1.format(valor);
+  if (tipo === 'dec') return fmt2.format(valor);
   return esc(valor);
 }
 
@@ -102,7 +182,8 @@ function celulaVariacao(coluna, ini, fim, anos, modo) {
 
   // Margem, ROE, DY, payout e DL/EBITDA já são razões: crescer de 2% para 4% não é
   // "dobrar de tamanho". Nesses vai a diferença absoluta, e CAGR não se aplica.
-  if (coluna.tipo !== 'mi') {
+  // Beta, cotação e EVA/ação (`dec`) são níveis como os valores em milhões, e compõem.
+  if (coluna.tipo === 'pct0' || coluna.tipo === 'pct1' || coluna.tipo === 'x') {
     if (modo === 'cagr') return { texto: '—', dica: 'CAGR não se aplica a um indicador que já é razão' };
     const d = b - a;
     return { texto: comSinal(d, coluna.tipo === 'x' ? 'x' : 'pp'), valor: d };
@@ -117,7 +198,7 @@ function celulaVariacao(coluna, ini, fim, anos, modo) {
 }
 
 function linhaVariacao(rotulo, modo, ini, fim, anos) {
-  const celulas = COLUNAS.map((coluna, i) => {
+  const celulas = COLUNAS().map((coluna, i) => {
     if (i === 0) return `<td class="emp-periodo">${esc(rotulo)}</td>`;
     const r = celulaVariacao(coluna, ini, fim, anos, modo);
     const classes = ['emp-num', typeof r.valor === 'number' && r.valor < 0 ? 'neg' : ''].join(' ');
@@ -128,8 +209,10 @@ function linhaVariacao(rotulo, modo, ini, fim, anos) {
 }
 
 function atualizaVariacao() {
+  const seletorDe = document.getElementById('empDe');
+  if (!DADOS || !seletorDe) return; // empresa com um único período: não há o que comparar
   const linhas = DADOS.linhas;
-  const iIni = Number(document.getElementById('empDe').value);
+  const iIni = Number(seletorDe.value);
   const iFim = Number(document.getElementById('empAte').value);
   const rodape = document.getElementById('empRodape');
   const intervalo = document.getElementById('empIntervalo');
@@ -191,7 +274,7 @@ function fechaBalao() {
 }
 
 function mostraBalao(coluna, de, ate, x, y) {
-  const c = COLUNAS[coluna];
+  const c = COLUNAS()[coluna];
   const ini = DADOS.linhas[de];
   const fim = DADOS.linhas[ate];
   const anos = anosEntre(ini, fim);
@@ -272,6 +355,29 @@ function ligaArrasto() {
   });
 }
 
+// ---- Abas ----
+// As duas abas leem as mesmas linhas, só mudam as colunas: trocar de aba não refaz o
+// fetch nem perde o período escolhido, é só redesenhar a tabela com o outro conjunto.
+function renderAbas() {
+  abasEl.innerHTML = ABAS
+    .map((a) => `<button type="button" class="emp-aba${a.id === ABA.id ? ' ativa' : ''}" data-aba="${a.id}">${esc(a.rotulo)}</button>`)
+    .join('');
+  abasEl.hidden = false;
+  abasEl.addEventListener('click', (ev) => {
+    const botao = ev.target.closest('.emp-aba');
+    if (!botao) return;
+    const nova = ABAS.find((a) => a.id === botao.dataset.aba);
+    if (!nova || nova.id === ABA.id) return;
+    ABA = nova;
+    abasEl.querySelectorAll('.emp-aba').forEach((b) => {
+      b.classList.toggle('ativa', b.dataset.aba === ABA.id);
+    });
+    fechaBalao();
+    conteudoEl.innerHTML = renderTabela(DADOS);
+    atualizaVariacao();
+  });
+}
+
 function opcoes(linhas, selecionado) {
   return linhas
     .map((l, i) => `<option value="${i}"${i === selecionado ? ' selected' : ''}>${esc(periodo(l))}</option>`)
@@ -293,11 +399,11 @@ function renderControles(linhas) {
 }
 
 function renderTabela(dados) {
-  const cabecalho = COLUNAS
+  const cabecalho = COLUNAS()
     .map((c) => `<th class="g-${c.grupo}">${esc(c.rotulo)}</th>`)
     .join('');
   const corpo = dados.linhas.map((linha, i) => {
-    const celulas = COLUNAS.map((c) => {
+    const celulas = COLUNAS().map((c) => {
       const valor = c.chave === 'periodo' ? periodo(linha) : linha[c.chave];
       const negativo = typeof valor === 'number' && valor < 0;
       const classes = [c.chave === 'periodo' ? 'emp-periodo' : 'emp-num', negativo ? 'neg' : ''].join(' ');
@@ -344,6 +450,7 @@ async function carrega() {
     DADOS = dados;
     subEl.textContent = `${dados.unidade} · exercícios encerrados e últimos 12 meses (TTM) · fonte: re_kpi`;
     conteudoEl.innerHTML = renderTabela(dados);
+    renderAbas();
     if (dados.linhas.length > 1) {
       renderControles(dados.linhas);
       atualizaVariacao();

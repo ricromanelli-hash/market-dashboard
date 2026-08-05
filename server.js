@@ -1458,14 +1458,6 @@ async function carregaAgendaEmpresas() {
 // Alimenta a página aberta ao clicar num ticker da B3. A leitura usa o mesmo caminho da
 // agenda (PostgREST + chave anon), então depende de a re_kpi ter policy de SELECT para
 // `anon` — sem ela a consulta volta vazia, sem erro, que é como a RLS nega.
-const KPI_COLUNAS = [
-  'dt_refer', 'ano', 'tipo_demonstracao', 'denom_cia',
-  'receita_liquida', 'ebitda', 'margem_ebitda', 'deprecamortiz', 'ebit',
-  'resultado_financeiro', 'impostos', 'lucro_liquido', 'margem_liquida',
-  'plcontabil', 'roe', 'caixaequivalentes', 'aplicacoes', 'divida_bruta', 'dl_ebitda',
-  'fco_contabil', 'capex', 'fci_contabil', 'fcf_contabil', 'fcl_contabil', 'fclyield',
-  'dividendos_pagos', 'payout', 'dy',
-].join(',');
 // A base vai de 2010 na maioria das empresas e chega a 20 exercícios em algumas, então
 // o teto é folgado de propósito: serve só para não estourar a tabela se a re_kpi crescer.
 const KPI_ANOS = 30;                         // exercícios exibidos, além da linha TTM
@@ -1475,48 +1467,125 @@ const kpiCache = new Map();                  // ticker -> { quando, dados }
 const num = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
 const milhoes = (v) => (num(v) === null ? null : +(Number(v) / 1e6).toFixed(0));
 const pct = (v) => (num(v) === null ? null : +(Number(v) * 100).toFixed(1));
+const razao = (v) => (num(v) === null ? null : +Number(v).toFixed(1));   // DL/EBIT, DL/EBITDA
+const decimal = (v) => (num(v) === null ? null : +Number(v).toFixed(2)); // beta, cotação, EVA/ação
+
+// Cada campo diz de que coluna da re_kpi ele vem e como se converte. A mesma lista monta
+// o `select` do PostgREST e monta a linha devolvida — com ~70 campos, manter isso em dois
+// lugares separados seria pedir para um deles ficar para trás.
+const CAMPOS_KPI = [
+  // resultado
+  ['receita', 'receita_liquida', milhoes],
+  ['cpv', 'cpv', milhoes],
+  ['lucroBruto', 'lucro_bruto', milhoes],
+  ['margemBruta', 'margem_bruta', pct],
+  ['dvga', 'dvga', milhoes],
+  ['ebitda', 'ebitda', milhoes],
+  ['margemEbitda', 'margem_ebitda', pct],
+  ['ebit', 'ebit', milhoes],
+  ['margemEbit', 'margem_ebit', pct],
+  ['resFin', 'resultado_financeiro', milhoes],
+  ['varCambial', 'despesas_variacao_cambial', milhoes],
+  ['despJuros', 'despesascomjuros', milhoes],
+  ['despJurosPct', 'despesascomjurosperc', pct],
+  ['ebt', 'ebt', milhoes],
+  ['margemEbt', 'wb_margem_ebt', pct],
+  ['impostos', 'impostos', milhoes],
+  ['impostosPct', 'perc_taxasircsllreal', pct],
+  ['lucro', 'lucro_liquido', milhoes],
+  ['margemLiquida', 'margem_liquida', pct],
+  // EVA
+  ['capInvestido', 'ativos_economicos', milhoes],
+  ['nopat', 'nopat', milhoes],
+  ['encargos', 'encargoscapital', milhoes],
+  ['eva', 'eva', milhoes],
+  ['roic', 'roic', pct],
+  ['wacc', 'wacc', pct],
+  ['spread', 'spreadroicwacc', pct],
+  ['margemNopat', 'margem_nopat', pct],
+  ['mva', 'mva', milhoes],
+  ['evaPorAcao', 'evaporacao', decimal],
+  // caixa do modelo econômico — `fco`/`fcf` não são as mesmas colunas de `fco_contabil`
+  // e `fcf_contabil` usadas na aba de indicadores, por isso o prefixo
+  ['evaFco', 'fco', milhoes],
+  ['evaFcf', 'fcf', milhoes],
+  ['invCapInv', 'invae', milhoes],
+  ['capGiro', 'varcgol', milhoes],
+  ['anc', 'varanc', milhoes],
+  // balanço e dívida
+  ['patrimonio', 'plcontabil', milhoes],
+  ['roe', 'roe', pct],
+  ['roeAjustado', 'wb_roe_ajustado', pct],
+  ['caixaEquiv', 'caixaequivalentes', milhoes],
+  ['divida', 'divida_bruta', milhoes],
+  ['dividaLiquida', 'divida_liquida', milhoes],
+  ['dividaCp', 'divida_cpperc', pct],
+  ['dividaLp', 'divida_lpperc', pct],
+  ['dlEbit', 'dl_ebit', razao],
+  ['dlEbitda', 'dl_ebitda', razao],
+  ['percCp', 'perc_cp', pct],
+  ['percCt', 'perc_ct', pct],
+  ['custoCp', 'custokemedio', pct],
+  ['custoCt', 'custokdaftertax', pct],
+  ['beta', 'beta', decimal],
+  // fluxo contábil (aba de indicadores)
+  ['fco', 'fco_contabil', milhoes],
+  ['capex', 'capex', milhoes],
+  ['fci', 'fci_contabil', milhoes],
+  ['fcf', 'fcf_contabil', milhoes],
+  ['fcl', 'fcl_contabil', milhoes],
+  ['fclYield', 'fclyield', pct],
+  // proventos
+  ['proventos', 'dividendos_pagos', milhoes],
+  ['payout', 'payout', pct],
+  ['dy', 'dy', pct],
+  // séries longas e crescimento
+  ['txCrescPl', 'wb_taxa_crescimento_pl', pct],
+  ['txCrescRl', 'wb_taxa_crescimento_reserva_lucros', pct],
+  ['capexSobreLl', 'wb_perc_despesas_capex', pct],
+  ['lucro10y', 'wb_lucroliquido10y', milhoes],
+  ['cpvSobreLb', 'wb_custo_cpv_perc', pct],
+  ['dvgaSobreLb', 'wb_dvga', pct],
+  ['jurosSobreEbit', 'wb_perc_despesas_juros', pct],
+  ['margemBruta10y', 'wb_margem_bruta10media', pct],
+  // mercado
+  ['valorMercado', 'valordemercado', milhoes],
+  ['valorFirma', 'enterprisevalue', milhoes],
+  ['papeis', 'qtdacoestotal', milhoes],
+  ['cotacaoOn', 'cotacaoon', decimal],
+  ['cotacaoPn', 'cotacaopn', decimal],
+];
+
+const KPI_COLUNAS = [...new Set([
+  'dt_refer', 'ano', 'tipo_demonstracao', 'denom_cia',
+  'deprecamortiz', 'aplicacoes', // entram nos campos derivados abaixo
+  ...CAMPOS_KPI.map(([, coluna]) => coluna),
+])].join(',');
 
 function linhaKpi(r) {
+  const linha = {
+    data: r.dt_refer,
+    ano: r.ano,
+    ttm: r.tipo_demonstracao === 'ITR', // no ITR a re_kpi já guarda os últimos 12 meses
+  };
+  for (const [chave, coluna, converte] of CAMPOS_KPI) linha[chave] = converte(r[coluna]);
+
+  // ---- derivados ----
+  const da = milhoes(r.deprecamortiz);
+  linha.da = da === null ? null : -Math.abs(da); // sai sempre como despesa
+  // A tabela não tem coluna de operações descontinuadas: é o que sobra entre o lucro
+  // líquido e o resultado antes dele (EBIT + financeiro + impostos).
   const ebit = num(r.ebit);
   const resFin = num(r.resultado_financeiro);
   const impostos = num(r.impostos);
   const lucro = num(r.lucro_liquido);
-  // A tabela não tem coluna de operações descontinuadas: é o que sobra entre o lucro
-  // líquido e o resultado antes dele (EBIT + financeiro + impostos).
   const opDesc = [ebit, resFin, impostos, lucro].every((v) => v !== null)
     ? lucro - (ebit + resFin + impostos)
     : null;
-  const caixa = (num(r.caixaequivalentes) || 0) + (num(r.aplicacoes) || 0);
-  return {
-    data: r.dt_refer,
-    ano: r.ano,
-    ttm: r.tipo_demonstracao === 'ITR', // no ITR a re_kpi já guarda os últimos 12 meses
-    receita: milhoes(r.receita_liquida),
-    ebitda: milhoes(r.ebitda),
-    margemEbitda: pct(r.margem_ebitda),
-    da: milhoes(r.deprecamortiz) === null ? null : -Math.abs(milhoes(r.deprecamortiz)),
-    ebit: milhoes(r.ebit),
-    resFin: milhoes(r.resultado_financeiro),
-    impostos: milhoes(r.impostos),
-    opDesc: opDesc === null ? null : +(opDesc / 1e6).toFixed(0),
-    lucro: milhoes(r.lucro_liquido),
-    margemLiquida: pct(r.margem_liquida),
-    patrimonio: milhoes(r.plcontabil),
-    roe: pct(r.roe),
-    caixa: milhoes(caixa),
-    divida: milhoes(r.divida_bruta),
-    dlEbitda: num(r.dl_ebitda) === null ? null : +Number(r.dl_ebitda).toFixed(1),
-    fco: milhoes(r.fco_contabil),
-    capex: milhoes(r.capex),
-    fci: milhoes(r.fci_contabil),
-    fcf: milhoes(r.fcf_contabil),
-    fcl: milhoes(r.fcl_contabil),
-    fclYield: pct(r.fclyield), // fração na re_kpi, como dy e roe
-
-    proventos: milhoes(r.dividendos_pagos),
-    payout: pct(r.payout),
-    dy: pct(r.dy),
-  };
+  linha.opDesc = opDesc === null ? null : +(opDesc / 1e6).toFixed(0);
+  // caixa da aba de indicadores soma as aplicações; a do EVA é só o disponível
+  linha.caixa = milhoes((num(r.caixaequivalentes) || 0) + (num(r.aplicacoes) || 0));
+  return linha;
 }
 
 async function carregaIndicadores(ticker) {

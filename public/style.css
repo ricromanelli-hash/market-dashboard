@@ -1067,6 +1067,35 @@ body.tv-mode a.row-stock:hover { background: none; }
 .g-divida { background: #8a4b3c; }
 .g-caixa { background: #2f6f70; }
 .g-provento { background: #5a4a7a; }
+.g-eva { background: #7a5a2f; }
+.g-mercado { background: #4a4a52; }
+
+/* ---- Abas (Indicadores · EVA) ---- */
+.emp-abas {
+  display: flex;
+  gap: 2px;
+  padding: 0 20px;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border);
+}
+.emp-abas[hidden] { display: none; }
+
+.emp-aba {
+  border: none;
+  background: none;
+  padding: 9px 18px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 3px solid transparent; /* reservado para não pular ao ativar */
+}
+.emp-aba:hover { color: var(--text); }
+.emp-aba.ativa {
+  color: var(--green-header);
+  border-bottom-color: var(--green-header);
+}
 
 /* ---- Seleção do período comparado ---- */
 .emp-controles {
