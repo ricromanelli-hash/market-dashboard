@@ -1466,7 +1466,9 @@ const KPI_COLUNAS = [
   'fco_contabil', 'capex', 'fci_contabil', 'fcf_contabil', 'fcl_contabil', 'fclyield',
   'dividendos_pagos', 'payout', 'dy',
 ].join(',');
-const KPI_ANOS = 10;                         // exercícios exibidos, além da linha TTM
+// A base vai de 2010 na maioria das empresas e chega a 20 exercícios em algumas, então
+// o teto é folgado de propósito: serve só para não estourar a tabela se a re_kpi crescer.
+const KPI_ANOS = 30;                         // exercícios exibidos, além da linha TTM
 const KPI_CACHE_MS = 60 * 60 * 1000;         // balanço muda no máximo uma vez por trimestre
 const kpiCache = new Map();                  // ticker -> { quando, dados }
 
@@ -1524,7 +1526,7 @@ async function carregaIndicadores(ticker) {
   const { cd_cvm: cvm, nome_curto: nomeCurto } = papeis[0];
   const bruto = await supabaseSelect(
     're_kpi',
-    `select=${KPI_COLUNAS}&cd_cvm=eq.${cvm}&order=dt_refer.desc&limit=40`,
+    `select=${KPI_COLUNAS}&cd_cvm=eq.${cvm}&order=dt_refer.desc&limit=60`,
   );
   if (!bruto.length) {
     // Empresa sem histórico OU RLS barrando a leitura — a diferença não vem no corpo.
