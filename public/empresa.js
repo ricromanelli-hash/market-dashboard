@@ -358,6 +358,7 @@ function ligaArrasto() {
     const i = [...th.parentElement.children].indexOf(th);
     if (!COLUNAS()[i] || COLUNAS()[i].tipo === 'texto') return;
     grafico.coluna = i;
+    if (grafico.secundaria === i) grafico.secundaria = null; // não se compara consigo mesmo
     renderModal();
   });
 
@@ -374,8 +375,9 @@ function ligaArrasto() {
   });
 
   modalEl.addEventListener('change', (ev) => {
-    if (ev.target.id !== 'empAnom') return;
-    grafico.ignorar = ev.target.checked;
+    if (ev.target.id === 'empAnom') grafico.ignorar = ev.target.checked;
+    else if (ev.target.id === 'empComp') grafico.secundaria = ev.target.value === '' ? null : Number(ev.target.value);
+    else return;
     renderModal();
   });
 
@@ -390,7 +392,7 @@ function ligaArrasto() {
 
 // `ignorar` começa ligado porque um único exercício atípico (P/L num ano de prejuízo,
 // margem sobre base quase zero) estica a escala e achata todo o resto do gráfico.
-const grafico = { coluna: null, tipo: 'barra', ignorar: true, anos: 'tudo' };
+const grafico = { coluna: null, secundaria: null, tipo: 'barra', ignorar: true, anos: 'tudo' };
 
 const JANELAS = [5, 10, 15];
 
@@ -455,14 +457,56 @@ function passoBonito(bruto) {
   return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * expoente;
 }
 
-function escalaY(valores) {
+// Fecha a escala em exatamente `faixas` divisões: com dois indicadores os dois eixos
+// precisam do mesmo número de marcas, senão a grade da esquerda não bate com a da direita.
+const FAIXAS = 5;
+
+function escalaY(valores, faixas = FAIXAS) {
   const min = Math.min(0, ...valores); // barra sempre nasce do zero
   const max = Math.max(0, ...valores);
-  const passo = passoBonito(((max - min) || Math.abs(max) || 1) / 5);
-  return { min: Math.floor(min / passo) * passo, max: Math.ceil(max / passo) * passo, passo };
+  let passo = passoBonito(((max - min) || Math.abs(max) || 1) / faixas);
+  for (let i = 0; i < 8; i += 1) {
+    const base = Math.floor(min / passo) * passo;
+    if (base + passo * faixas >= max - 1e-9) return { min: base, max: base + passo * faixas, passo };
+    passo = passoBonito(passo * 1.5); // não coube nas faixas: sobe para o próximo passo redondo
+  }
+  return { min, max, passo: (max - min) / faixas };
 }
 
-function desenhaGrafico(dados) {
+// Segundo indicador nos mesmos períodos do primeiro: o eixo x é compartilhado, então
+// quem manda no recorte (janela + anomalias) é sempre a série que foi clicada.
+function serieAlinhada(indice, mostrados) {
+  const coluna = COLUNAS()[indice];
+  const porRotulo = new Map(DADOS.linhas.map((l) => [rotuloCurto(l), l]));
+  const valores = mostrados.map((p) => {
+    const linha = porRotulo.get(p.rotulo);
+    const v = linha ? linha[coluna.chave] : null;
+    return typeof v === 'number' ? v : null;
+  });
+  return { coluna, valores, presentes: valores.filter((v) => v !== null) };
+}
+
+// Uma série vira barras ou linha conforme `estilo`. Com dois indicadores o segundo pega
+// sempre o estilo oposto ao do primeiro — duas linhas ou duas barras se confundiriam.
+function desenhaSerie(pontos, estilo, y, cx, banda, sufixo) {
+  const validos = pontos.map((v, i) => ({ v, i })).filter((p) => p.v !== null);
+  if (!validos.length) return '';
+  if (estilo === 'linha') {
+    const pts = validos.map((p) => `${cx(p.i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
+    return `<polyline class="g-linha${sufixo}" fill="none" points="${pts}"/>
+      ${validos.map((p) => `<circle class="g-ponto${sufixo}" cx="${cx(p.i).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="3.5"/>`).join('')}`;
+  }
+  const largura = Math.min(46, banda * 0.62);
+  const y0 = y(0);
+  return validos.map((p) => {
+    const yv = y(p.v);
+    return `<rect class="g-barra${sufixo}${p.v < 0 ? ' neg' : ''}" x="${(cx(p.i) - largura / 2).toFixed(1)}"
+      y="${Math.min(yv, y0).toFixed(1)}" width="${largura.toFixed(1)}"
+      height="${Math.max(Math.abs(yv - y0), 1).toFixed(1)}" rx="2"/>`;
+  }).join('');
+}
+
+function desenhaGrafico(dados, sec) {
   const { coluna, mostrados } = dados;
   if (!mostrados.length) return '<p class="emp-grafico-vazio">Sem valores para este indicador.</p>';
 
@@ -476,45 +520,60 @@ function desenhaGrafico(dados) {
   const cx = (i) => G.esq + banda * (i + 0.5);
   const rotulo = (v) => formata(+v.toFixed(6), coluna.tipo);
 
-  const marcas = Math.round((escala.max - escala.min) / escala.passo);
+  // eixo da direita só existe com o segundo indicador, e com as mesmas faixas da esquerda
+  const escala2 = sec && sec.presentes.length ? escalaY(sec.presentes) : null;
+  const y2 = (v) => G.topo + ph - ((v - escala2.min) / (escala2.max - escala2.min)) * ph;
+  const rotulo2 = (v) => (sec ? formata(+v.toFixed(6), sec.coluna.tipo) : '');
+
   let grade = '';
-  for (let k = 0; k <= marcas; k += 1) {
+  for (let k = 0; k <= FAIXAS; k += 1) {
     const v = escala.min + k * escala.passo;
     const classe = Math.abs(v) < escala.passo / 1000 ? 'g-zero' : 'g-grade';
     grade += `<line class="${classe}" x1="${G.esq}" y1="${y(v)}" x2="${G.esq + pw}" y2="${y(v)}"/>
       <text class="g-eixo" x="${G.esq - 8}" y="${y(v) + 3.5}">${rotulo(v)}</text>`;
+    if (escala2) {
+      const v2 = escala2.min + k * escala2.passo;
+      grade += `<text class="g-eixo2" x="${G.esq + pw + 8}" y="${y(v) + 3.5}">${rotulo2(v2)}</text>`;
+    }
   }
 
-  const larguraBarra = Math.min(46, banda * 0.62);
-  const y0 = y(0);
-  const serie = grafico.tipo === 'linha'
-    ? `<polyline class="g-linha" fill="none" points="${mostrados.map((p, i) => `${cx(i).toFixed(1)},${y(p.valor).toFixed(1)}`).join(' ')}"/>
-       ${mostrados.map((p, i) => `<circle class="g-ponto" cx="${cx(i).toFixed(1)}" cy="${y(p.valor).toFixed(1)}" r="3.5"/>`).join('')}`
-    : mostrados.map((p, i) => {
-      const yv = y(p.valor);
-      return `<rect class="g-barra${p.valor < 0 ? ' neg' : ''}" x="${(cx(i) - larguraBarra / 2).toFixed(1)}"
-        y="${Math.min(yv, y0).toFixed(1)}" width="${larguraBarra.toFixed(1)}"
-        height="${Math.max(Math.abs(yv - y0), 1).toFixed(1)}" rx="2"/>`;
-    }).join('');
+  const estilo2 = grafico.tipo === 'linha' ? 'barra' : 'linha';
+  // o que for barra vai primeiro, para a linha do outro indicador não ficar por baixo
+  const camadas = [
+    { html: desenhaSerie(valores, grafico.tipo, y, cx, banda, ''), estilo: grafico.tipo },
+    escala2
+      ? { html: desenhaSerie(sec.valores, estilo2, y2, cx, banda, '2'), estilo: estilo2 }
+      : null,
+  ].filter(Boolean).sort((a, b) => (a.estilo === 'barra' ? -1 : 1) - (b.estilo === 'barra' ? -1 : 1));
 
-  const valoresEsc = mostrados.map((p, i) => {
-    const yv = y(p.valor);
-    // rótulo por fora da barra: por dentro ele some nas barras curtas
-    const dy = p.valor >= 0 ? -7 : 13;
-    return `<text class="g-valor" x="${cx(i).toFixed(1)}" y="${(yv + dy).toFixed(1)}">${rotulo(p.valor)}</text>`;
+  // com duas séries o rótulo em cada ponto vira ruído; a leitura passa a ser pelos eixos
+  const valoresEsc = sec ? '' : mostrados.map((p, i) => {
+    const dy = p.valor >= 0 ? -7 : 13; // por fora da barra: por dentro some nas curtas
+    return `<text class="g-valor" x="${cx(i).toFixed(1)}" y="${(y(p.valor) + dy).toFixed(1)}">${rotulo(p.valor)}</text>`;
   }).join('');
 
   const periodos = mostrados
     .map((p, i) => `<text class="g-periodo" x="${cx(i).toFixed(1)}" y="${G.topo + ph + 18}">${esc(p.rotulo)}</text>`)
     .join('');
 
+  // sem segundo indicador a margem direita é do rótulo da mediana; com ele, do eixo
+  const marcaMediana = escala2
+    ? `<line class="g-mediana" x1="${G.esq}" y1="${y(mediana).toFixed(1)}" x2="${G.esq + pw}" y2="${y(mediana).toFixed(1)}"/>`
+    : `<line class="g-mediana" x1="${G.esq}" y1="${y(mediana).toFixed(1)}" x2="${G.esq + pw + 6}" y2="${y(mediana).toFixed(1)}"/>
+       <text class="g-mediana-rot" x="${G.esq + pw + 10}" y="${(y(mediana) - 2).toFixed(1)}">mediana</text>
+       <text class="g-mediana-val" x="${G.esq + pw + 10}" y="${(y(mediana) + 11).toFixed(1)}">${rotulo(mediana)}</text>`;
+
+  const titulos = escala2
+    ? `<text class="g-titulo-eixo" x="${G.esq - 8}" y="14">${esc(coluna.rotulo)}</text>
+       <text class="g-titulo-eixo2" x="${G.esq + pw + 8}" y="14">${esc(sec.coluna.rotulo)}</text>`
+    : '';
+
   return `<svg viewBox="0 0 ${G.w} ${G.h}" class="emp-svg" role="img"
-      aria-label="histórico de ${esc(coluna.rotulo)}">
+      aria-label="histórico de ${esc(coluna.rotulo)}${sec ? ` e ${esc(sec.coluna.rotulo)}` : ''}">
     ${grade}
-    <line class="g-mediana" x1="${G.esq}" y1="${y(mediana).toFixed(1)}" x2="${G.esq + pw + 6}" y2="${y(mediana).toFixed(1)}"/>
-    <text class="g-mediana-rot" x="${G.esq + pw + 10}" y="${(y(mediana) - 2).toFixed(1)}">mediana</text>
-    <text class="g-mediana-val" x="${G.esq + pw + 10}" y="${(y(mediana) + 11).toFixed(1)}">${rotulo(mediana)}</text>
-    ${serie}
+    ${titulos}
+    ${marcaMediana}
+    ${camadas.map((c) => c.html).join('')}
     ${valoresEsc}
     ${periodos}
   </svg>`;
@@ -544,6 +603,19 @@ function renderModal() {
     .map((n) => `<button type="button" data-anos="${n}"${String(grafico.anos) === String(n) ? ' class="ativo"' : ''}>${n === 'tudo' ? 'Tudo' : `${n} anos`}</button>`)
     .join('');
 
+  const sec = grafico.secundaria === null ? null : serieAlinhada(grafico.secundaria, dados.mostrados);
+  const opcoesComp = COLUNAS()
+    .map((c, i) => ({ c, i }))
+    .filter(({ c, i }) => c.tipo !== 'texto' && i !== grafico.coluna)
+    .map(({ c, i }) => `<option value="${i}"${i === grafico.secundaria ? ' selected' : ''}>${esc(c.rotulo)}</option>`)
+    .join('');
+  const legenda = sec
+    ? `<div class="emp-legenda">
+        <span class="emp-leg"><i class="emp-leg-cor ${grafico.tipo === 'linha' ? 'linha' : 'barra'}"></i>${esc(coluna.rotulo)}</span>
+        <span class="emp-leg"><i class="emp-leg-cor ${grafico.tipo === 'linha' ? 'barra2' : 'linha2'}"></i>${esc(sec.coluna.rotulo)}</span>
+      </div>`
+    : '';
+
   modalEl.innerHTML = `
     <div class="emp-modal-fundo"></div>
     <div class="emp-modal-caixa" role="dialog" aria-modal="true">
@@ -570,8 +642,16 @@ function renderModal() {
         ${tile('Mediana', quantil(ordenados, 0.5), coluna.tipo)}
         ${tile('Média', media(valores), coluna.tipo)}
       </div>
-      <div class="emp-grafico">${desenhaGrafico(dados)}</div>
-      <p class="emp-modal-nota">${esc(nota)}</p>
+      <label class="emp-modal-comp">
+        Comparar com
+        <select id="empComp">
+          <option value=""${grafico.secundaria === null ? ' selected' : ''}>— nenhum —</option>
+          ${opcoesComp}
+        </select>
+      </label>
+      ${legenda}
+      <div class="emp-grafico">${desenhaGrafico(dados, sec)}</div>
+      <p class="emp-modal-nota">${esc(nota)}${sec ? ' Os tiles e a mediana são do indicador clicado; o segundo acompanha os mesmos períodos, no eixo da direita.' : ''}</p>
     </div>`;
   modalEl.hidden = false;
 }
@@ -600,6 +680,7 @@ function renderAbas() {
     });
     fechaBalao();
     fechaGrafico(); // o índice da coluna aberta era o da outra aba
+    grafico.secundaria = null;
     conteudoEl.innerHTML = renderTabela(DADOS);
     atualizaVariacao();
   });
