@@ -7,6 +7,7 @@ const TICKER = (params.get('ticker') || '').toUpperCase().replace(/[^A-Z0-9]/g, 
 const tituloEl = document.getElementById('empTitulo');
 const subEl = document.getElementById('empSub');
 const abasEl = document.getElementById('empAbas');
+const modalEl = document.getElementById('empModal');
 const controlesEl = document.getElementById('empControles');
 const balaoEl = document.getElementById('empBalao');
 const conteudoEl = document.getElementById('empConteudo');
@@ -350,9 +351,210 @@ function ligaArrasto() {
     if (ev.target.closest('.emp-balao-x')) fechaBalao();
   });
 
-  document.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Escape') fechaBalao();
+  // clique no cabeçalho abre o histórico da coluna (o arrasto só pega o corpo)
+  conteudoEl.addEventListener('click', (ev) => {
+    const th = ev.target.closest('th');
+    if (!th || !conteudoEl.contains(th)) return;
+    const i = [...th.parentElement.children].indexOf(th);
+    if (!COLUNAS()[i] || COLUNAS()[i].tipo === 'texto') return;
+    grafico.coluna = i;
+    renderModal();
   });
+
+  modalEl.addEventListener('click', (ev) => {
+    if (ev.target.closest('.emp-modal-x') || ev.target.classList.contains('emp-modal-fundo')) {
+      fechaGrafico();
+      return;
+    }
+    const botao = ev.target.closest('.emp-modal-tipo button');
+    if (botao) {
+      grafico.tipo = botao.dataset.tipo;
+      renderModal();
+    }
+  });
+
+  modalEl.addEventListener('change', (ev) => {
+    if (ev.target.id !== 'empAnom') return;
+    grafico.ignorar = ev.target.checked;
+    renderModal();
+  });
+
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Escape') return;
+    fechaBalao();
+    fechaGrafico();
+  });
+}
+
+// ---- Histórico do indicador: clique no cabeçalho da coluna ----
+
+// `ignorar` começa ligado porque um único exercício atípico (P/L num ano de prejuízo,
+// margem sobre base quase zero) estica a escala e achata todo o resto do gráfico.
+const grafico = { coluna: null, tipo: 'barra', ignorar: true };
+
+const rotuloCurto = (l) => (l.ttm ? 'TTM' : String(l.ano ?? periodo(l)));
+
+function quantil(ordenados, q) {
+  if (!ordenados.length) return null;
+  const pos = (ordenados.length - 1) * q;
+  const base = Math.floor(pos);
+  const seguinte = ordenados[base + 1];
+  if (seguinte === undefined) return ordenados[base];
+  return ordenados[base] + (pos - base) * (seguinte - ordenados[base]);
+}
+
+const media = (vs) => (vs.length ? vs.reduce((s, v) => s + v, 0) / vs.length : null);
+
+// Tukey: fora de [Q1 − 1,5·IQR, Q3 + 1,5·IQR]. Com menos de 5 pontos o intervalo é
+// instável demais — um valor legítimo viraria "anomalia" e sumiria do gráfico.
+function limitesAnomalia(valores) {
+  if (valores.length < 5) return null;
+  const ord = [...valores].sort((a, b) => a - b);
+  const q1 = quantil(ord, 0.25);
+  const q3 = quantil(ord, 0.75);
+  const iqr = q3 - q1;
+  if (!(iqr > 0)) return null;
+  return { min: q1 - 1.5 * iqr, max: q3 + 1.5 * iqr };
+}
+
+function pontosDoIndicador(indice) {
+  const coluna = COLUNAS()[indice];
+  const todos = DADOS.linhas
+    .map((l) => ({ rotulo: rotuloCurto(l), valor: l[coluna.chave] }))
+    .filter((p) => typeof p.valor === 'number');
+  const limites = grafico.ignorar ? limitesAnomalia(todos.map((p) => p.valor)) : null;
+  const mostrados = limites
+    ? todos.filter((p) => p.valor >= limites.min && p.valor <= limites.max)
+    : todos;
+  return { coluna, todos, mostrados, ocultos: todos.length - mostrados.length };
+}
+
+// `dir` é folgado porque o rótulo da mediana mora na margem direita: em cima da área do
+// gráfico ele batia nas barras dos últimos anos, justamente onde a linha costuma passar.
+const G = { w: 960, h: 380, esq: 68, dir: 92, topo: 26, base: 38 };
+
+// Escala com marcas em 1, 2 ou 5 vezes uma potência de 10: sem isto o eixo sai com
+// rótulos como 137.428, que não ajudam a ler nada.
+function passoBonito(bruto) {
+  const expoente = 10 ** Math.floor(Math.log10(bruto));
+  const n = bruto / expoente;
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * expoente;
+}
+
+function escalaY(valores) {
+  const min = Math.min(0, ...valores); // barra sempre nasce do zero
+  const max = Math.max(0, ...valores);
+  const passo = passoBonito(((max - min) || Math.abs(max) || 1) / 5);
+  return { min: Math.floor(min / passo) * passo, max: Math.ceil(max / passo) * passo, passo };
+}
+
+function desenhaGrafico(dados) {
+  const { coluna, mostrados } = dados;
+  if (!mostrados.length) return '<p class="emp-grafico-vazio">Sem valores para este indicador.</p>';
+
+  const valores = mostrados.map((p) => p.valor);
+  const mediana = quantil([...valores].sort((a, b) => a - b), 0.5);
+  const escala = escalaY([...valores, mediana]);
+  const pw = G.w - G.esq - G.dir;
+  const ph = G.h - G.topo - G.base;
+  const y = (v) => G.topo + ph - ((v - escala.min) / (escala.max - escala.min)) * ph;
+  const banda = pw / mostrados.length;
+  const cx = (i) => G.esq + banda * (i + 0.5);
+  const rotulo = (v) => formata(+v.toFixed(6), coluna.tipo);
+
+  const marcas = Math.round((escala.max - escala.min) / escala.passo);
+  let grade = '';
+  for (let k = 0; k <= marcas; k += 1) {
+    const v = escala.min + k * escala.passo;
+    const classe = Math.abs(v) < escala.passo / 1000 ? 'g-zero' : 'g-grade';
+    grade += `<line class="${classe}" x1="${G.esq}" y1="${y(v)}" x2="${G.esq + pw}" y2="${y(v)}"/>
+      <text class="g-eixo" x="${G.esq - 8}" y="${y(v) + 3.5}">${rotulo(v)}</text>`;
+  }
+
+  const larguraBarra = Math.min(46, banda * 0.62);
+  const y0 = y(0);
+  const serie = grafico.tipo === 'linha'
+    ? `<polyline class="g-linha" fill="none" points="${mostrados.map((p, i) => `${cx(i).toFixed(1)},${y(p.valor).toFixed(1)}`).join(' ')}"/>
+       ${mostrados.map((p, i) => `<circle class="g-ponto" cx="${cx(i).toFixed(1)}" cy="${y(p.valor).toFixed(1)}" r="3.5"/>`).join('')}`
+    : mostrados.map((p, i) => {
+      const yv = y(p.valor);
+      return `<rect class="g-barra${p.valor < 0 ? ' neg' : ''}" x="${(cx(i) - larguraBarra / 2).toFixed(1)}"
+        y="${Math.min(yv, y0).toFixed(1)}" width="${larguraBarra.toFixed(1)}"
+        height="${Math.max(Math.abs(yv - y0), 1).toFixed(1)}" rx="2"/>`;
+    }).join('');
+
+  const valoresEsc = mostrados.map((p, i) => {
+    const yv = y(p.valor);
+    // rótulo por fora da barra: por dentro ele some nas barras curtas
+    const dy = p.valor >= 0 ? -7 : 13;
+    return `<text class="g-valor" x="${cx(i).toFixed(1)}" y="${(yv + dy).toFixed(1)}">${rotulo(p.valor)}</text>`;
+  }).join('');
+
+  const periodos = mostrados
+    .map((p, i) => `<text class="g-periodo" x="${cx(i).toFixed(1)}" y="${G.topo + ph + 18}">${esc(p.rotulo)}</text>`)
+    .join('');
+
+  return `<svg viewBox="0 0 ${G.w} ${G.h}" class="emp-svg" role="img"
+      aria-label="histórico de ${esc(coluna.rotulo)}">
+    ${grade}
+    <line class="g-mediana" x1="${G.esq}" y1="${y(mediana).toFixed(1)}" x2="${G.esq + pw + 6}" y2="${y(mediana).toFixed(1)}"/>
+    <text class="g-mediana-rot" x="${G.esq + pw + 10}" y="${(y(mediana) - 2).toFixed(1)}">mediana</text>
+    <text class="g-mediana-val" x="${G.esq + pw + 10}" y="${(y(mediana) + 11).toFixed(1)}">${rotulo(mediana)}</text>
+    ${serie}
+    ${valoresEsc}
+    ${periodos}
+  </svg>`;
+}
+
+function tile(nome, valor, tipo) {
+  const texto = valor === null || valor === undefined ? '—' : formata(valor, tipo);
+  return `<div class="emp-tile"><span>${esc(nome)}</span><strong>${texto}</strong></div>`;
+}
+
+function renderModal() {
+  const dados = pontosDoIndicador(grafico.coluna);
+  const { coluna } = dados;
+  const valores = dados.mostrados.map((p) => p.valor);
+  const ordenados = [...valores].sort((a, b) => a - b);
+  const atual = dados.todos.length ? dados.todos[dados.todos.length - 1].valor : null;
+  const nota = dados.ocultos
+    ? `${dados.ocultos} período${dados.ocultos > 1 ? 's' : ''} fora do intervalo de Tukey (Q1−1,5·IQR a Q3+1,5·IQR) — desmarque acima para ver.`
+    : 'Nenhum período fora do intervalo esperado.';
+
+  modalEl.innerHTML = `
+    <div class="emp-modal-fundo"></div>
+    <div class="emp-modal-caixa" role="dialog" aria-modal="true">
+      <header class="emp-modal-topo">
+        <h2>Histórico de Indicadores · ${esc(TICKER)}</h2>
+        <button type="button" class="emp-modal-x" aria-label="fechar">×</button>
+      </header>
+      <div class="emp-modal-ctrl">
+        <span class="emp-modal-ind">
+          <span class="emp-modal-ind-rot">Indicador</span>
+          <strong>${esc(coluna.rotulo)}</strong>
+        </span>
+        <label class="emp-modal-anom">
+          <input type="checkbox" id="empAnom"${grafico.ignorar ? ' checked' : ''}> Ignorar anomalias
+        </label>
+        <div class="emp-modal-tipo">
+          <button type="button" data-tipo="linha"${grafico.tipo === 'linha' ? ' class="ativo"' : ''}>Linhas</button>
+          <button type="button" data-tipo="barra"${grafico.tipo === 'barra' ? ' class="ativo"' : ''}>Barra</button>
+        </div>
+      </div>
+      <div class="emp-tiles">
+        ${tile('Valor atual', atual, coluna.tipo)}
+        ${tile('Mediana', quantil(ordenados, 0.5), coluna.tipo)}
+        ${tile('Média', media(valores), coluna.tipo)}
+      </div>
+      <div class="emp-grafico">${desenhaGrafico(dados)}</div>
+      <p class="emp-modal-nota">${esc(nota)}</p>
+    </div>`;
+  modalEl.hidden = false;
+}
+
+function fechaGrafico() {
+  modalEl.hidden = true;
+  modalEl.innerHTML = '';
 }
 
 // ---- Abas ----
@@ -373,6 +575,7 @@ function renderAbas() {
       b.classList.toggle('ativa', b.dataset.aba === ABA.id);
     });
     fechaBalao();
+    fechaGrafico(); // o índice da coluna aberta era o da outra aba
     conteudoEl.innerHTML = renderTabela(DADOS);
     atualizaVariacao();
   });
@@ -400,7 +603,11 @@ function renderControles(linhas) {
 
 function renderTabela(dados) {
   const cabecalho = COLUNAS()
-    .map((c) => `<th class="g-${c.grupo}">${esc(c.rotulo)}</th>`)
+    .map((c) => {
+      const clicavel = c.tipo !== 'texto';
+      const dica = clicavel ? ` title="ver histórico de ${esc(c.rotulo)}"` : '';
+      return `<th class="g-${c.grupo}${clicavel ? ' emp-th-hist' : ''}"${dica}>${esc(c.rotulo)}</th>`;
+    })
     .join('');
   const corpo = dados.linhas.map((linha, i) => {
     const celulas = COLUNAS().map((c) => {
