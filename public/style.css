@@ -1104,6 +1104,74 @@ body.tv-mode a.row-stock:hover { background: none; }
   border-bottom-color: var(--green-header);
 }
 
+/* ---- Favoritos: combinações salvas de indicadores ---- */
+.emp-favs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 9px 20px;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.emp-favs[hidden] { display: none; }
+
+.emp-favs-rot {
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-right: 2px;
+}
+
+.emp-fav {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  overflow: hidden;
+  background: #f4f6f4;
+}
+.emp-fav-abrir {
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--green-header);
+  padding: 4px 4px 4px 12px;
+  cursor: pointer;
+}
+.emp-fav-abrir:hover { text-decoration: underline; }
+.emp-fav-x {
+  border: none;
+  background: none;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-muted);
+  padding: 3px 9px 4px 4px;
+  cursor: pointer;
+}
+.emp-fav-x:hover { color: var(--red-down); }
+
+.emp-fav-btn {
+  margin-left: auto;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--card-bg);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 5px 12px;
+  cursor: pointer;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.emp-fav-btn:hover { color: var(--text); }
+.emp-fav-btn.ativo {
+  color: #8a6a12;
+  border-color: #d9c48a;
+  background: #fdf6e3;
+  font-weight: 600;
+}
+
 /* ---- Seleção do período comparado ---- */
 .emp-controles {
   display: flex;

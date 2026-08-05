@@ -7,6 +7,7 @@ const TICKER = (params.get('ticker') || '').toUpperCase().replace(/[^A-Z0-9]/g, 
 const tituloEl = document.getElementById('empTitulo');
 const subEl = document.getElementById('empSub');
 const abasEl = document.getElementById('empAbas');
+const favsEl = document.getElementById('empFavs');
 const modalEl = document.getElementById('empModal');
 const dicaEl = document.getElementById('empDica');
 const controlesEl = document.getElementById('empControles');
@@ -366,6 +367,10 @@ function ligaArrasto() {
   modalEl.addEventListener('click', (ev) => {
     if (ev.target.closest('.emp-modal-x') || ev.target.classList.contains('emp-modal-fundo')) {
       fechaGrafico();
+      return;
+    }
+    if (ev.target.closest('#empFav')) {
+      alternaFavorito();
       return;
     }
     const tirar = ev.target.closest('[data-remover]');
@@ -740,6 +745,7 @@ function renderModal() {
     .map((n) => `<button type="button" data-anos="${n}"${String(grafico.anos) === String(n) ? ' class="ativo"' : ''}>${n === 'tudo' ? 'Tudo' : `${n} anos`}</button>`)
     .join('');
 
+  const favorito = ehFavorito();
   const usadas = [grafico.coluna, ...grafico.series];
   // a próxima a entrar já divide eixo se for a terceira, ou se o gráfico for empilhado
   const proximaDivideEixo = grafico.tipo === 'empilhada' || grafico.series.length >= 1;
@@ -790,6 +796,9 @@ function renderModal() {
           <option value="">+ indicador…</option>
           ${opcoesComp}
         </select>` : ''}
+        <button type="button" id="empFav" class="emp-fav-btn${favorito ? ' ativo' : ''}">
+          ${favorito ? '★' : '☆'} ${favorito ? 'Favorito' : 'Salvar'}
+        </button>
       </div>
       <div class="emp-grafico">${desenhaGrafico(dados)}</div>
       <p class="emp-modal-nota">${esc(nota)}${esc(notaSeries)}</p>
@@ -867,15 +876,125 @@ function renderAbas() {
     if (!botao) return;
     const nova = ABAS.find((a) => a.id === botao.dataset.aba);
     if (!nova || nova.id === ABA.id) return;
-    ABA = nova;
-    abasEl.querySelectorAll('.emp-aba').forEach((b) => {
-      b.classList.toggle('ativa', b.dataset.aba === ABA.id);
-    });
-    fechaBalao();
     fechaGrafico(); // o índice da coluna aberta era o da outra aba
     grafico.series = [];
-    conteudoEl.innerHTML = renderTabela(DADOS);
-    atualizaVariacao();
+    trocaAba(nova);
+  });
+}
+
+// Só a tabela: quem chama decide o que fazer com o gráfico aberto — trocar de aba pelo
+// botão fecha, mas abrir um favorito de outra aba precisa manter.
+function trocaAba(nova) {
+  ABA = nova;
+  abasEl.querySelectorAll('.emp-aba').forEach((b) => {
+    b.classList.toggle('ativa', b.dataset.aba === ABA.id);
+  });
+  fechaBalao();
+  conteudoEl.innerHTML = renderTabela(DADOS);
+  atualizaVariacao();
+}
+
+// ---- Favoritos ----
+// Combinações salvas ficam no navegador e valem para qualquer empresa: guardam a chave
+// da coluna, não o índice, que muda de aba para aba e mudaria se a tabela ganhasse colunas.
+const FAVS_CHAVE = 'market-dashboard:graficos-favoritos';
+
+function leFavoritos() {
+  try {
+    const cru = JSON.parse(localStorage.getItem(FAVS_CHAVE));
+    return Array.isArray(cru) ? cru : [];
+  } catch (err) {
+    return []; // json estragado ou storage bloqueado: começa vazio
+  }
+}
+
+let FAVORITOS = leFavoritos();
+
+function gravaFavoritos() {
+  try {
+    localStorage.setItem(FAVS_CHAVE, JSON.stringify(FAVORITOS));
+  } catch (err) {
+    // navegação privada ou storage cheio: o favorito ainda vale nesta sessão
+  }
+}
+
+const configAtual = () => ({
+  aba: ABA.id,
+  chaves: [grafico.coluna, ...grafico.series].map((i) => COLUNAS()[i].chave),
+  tipo: grafico.tipo,
+  anos: grafico.anos,
+  ignorar: grafico.ignorar,
+});
+
+const assinatura = (f) => `${f.aba}|${f.chaves.join(',')}|${f.tipo}`;
+
+// O nome sai dos rótulos atuais, não de um texto salvo: se uma coluna for renomeada, o
+// favorito acompanha em vez de virar um apelido morto.
+function nomeFavorito(f) {
+  const aba = ABAS.find((a) => a.id === f.aba);
+  if (!aba) return '';
+  const rotulos = f.chaves
+    .map((ch) => (aba.colunas.find((c) => c.chave === ch) || {}).rotulo)
+    .filter(Boolean);
+  return rotulos.length === f.chaves.length ? rotulos.join(' × ') : '';
+}
+
+function ehFavorito() {
+  return FAVORITOS.some((f) => assinatura(f) === assinatura(configAtual()));
+}
+
+function alternaFavorito() {
+  const atual = configAtual();
+  const chave = assinatura(atual);
+  FAVORITOS = FAVORITOS.some((f) => assinatura(f) === chave)
+    ? FAVORITOS.filter((f) => assinatura(f) !== chave)
+    : [...FAVORITOS, atual];
+  gravaFavoritos();
+  renderFavoritos();
+  renderModal();
+}
+
+function aplicaFavorito(pos) {
+  const f = FAVORITOS[pos];
+  if (!f) return;
+  const aba = ABAS.find((a) => a.id === f.aba);
+  if (aba && aba.id !== ABA.id) trocaAba(aba);
+  const indices = f.chaves.map((ch) => COLUNAS().findIndex((c) => c.chave === ch));
+  if (indices.some((i) => i < 0)) return;
+  grafico.coluna = indices[0];
+  grafico.series = indices.slice(1);
+  grafico.tipo = f.tipo;
+  grafico.anos = f.anos;
+  grafico.ignorar = f.ignorar;
+  renderModal();
+}
+
+function renderFavoritos() {
+  const fichas = FAVORITOS.map((f, i) => {
+    const nome = nomeFavorito(f);
+    if (!nome) return ''; // aba ou coluna que não existe mais
+    const aba = ABAS.find((a) => a.id === f.aba);
+    return `<span class="emp-fav">
+      <button type="button" class="emp-fav-abrir" data-fav="${i}" title="${esc(aba.rotulo)} · ${esc(f.tipo)}">${esc(nome)}</button>
+      <button type="button" class="emp-fav-x" data-favx="${i}" aria-label="tirar ${esc(nome)} dos favoritos">×</button>
+    </span>`;
+  }).join('');
+  favsEl.innerHTML = fichas ? `<span class="emp-favs-rot">Favoritos</span>${fichas}` : '';
+  favsEl.hidden = !fichas;
+}
+
+function ligaFavoritos() {
+  favsEl.addEventListener('click', (ev) => {
+    const tirar = ev.target.closest('[data-favx]');
+    if (tirar) {
+      FAVORITOS = FAVORITOS.filter((_, i) => i !== Number(tirar.dataset.favx));
+      gravaFavoritos();
+      renderFavoritos();
+      if (!modalEl.hidden) renderModal(); // a estrela do gráfico aberto pode ter mudado
+      return;
+    }
+    const abrir = ev.target.closest('[data-fav]');
+    if (abrir) aplicaFavorito(Number(abrir.dataset.fav));
   });
 }
 
@@ -956,6 +1075,8 @@ async function carrega() {
     subEl.textContent = `${dados.unidade} · exercícios encerrados e últimos 12 meses (TTM) · fonte: re_kpi`;
     conteudoEl.innerHTML = renderTabela(dados);
     renderAbas();
+    renderFavoritos();
+    ligaFavoritos();
     if (dados.linhas.length > 1) {
       renderControles(dados.linhas);
       atualizaVariacao();
