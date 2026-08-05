@@ -8,6 +8,7 @@ const tituloEl = document.getElementById('empTitulo');
 const subEl = document.getElementById('empSub');
 const abasEl = document.getElementById('empAbas');
 const modalEl = document.getElementById('empModal');
+const dicaEl = document.getElementById('empDica');
 const controlesEl = document.getElementById('empControles');
 const balaoEl = document.getElementById('empBalao');
 const conteudoEl = document.getElementById('empConteudo');
@@ -374,6 +375,12 @@ function ligaArrasto() {
     renderModal();
   });
 
+  modalEl.addEventListener('mousemove', (ev) => {
+    if (ev.target.closest('.emp-grafico')) moveDica(ev);
+    else escondeDica();
+  });
+  modalEl.addEventListener('mouseleave', escondeDica);
+
   modalEl.addEventListener('change', (ev) => {
     if (ev.target.id === 'empAnom') grafico.ignorar = ev.target.checked;
     else if (ev.target.id === 'empComp') grafico.secundaria = ev.target.value === '' ? null : Number(ev.target.value);
@@ -395,6 +402,10 @@ function ligaArrasto() {
 const grafico = { coluna: null, secundaria: null, tipo: 'barra', ignorar: true, anos: 'tudo' };
 
 const JANELAS = [5, 10, 15];
+
+// Geometria do último gráfico desenhado, para o hover achar o período sob o mouse sem
+// precisar de um elemento por barra.
+let GEO = null;
 
 // A janela conta exercícios encerrados e sempre mantém o TTM: "5 anos" é meia década
 // fechada mais onde a empresa está hoje, que é a leitura que a barra "Atual" pede.
@@ -568,9 +579,19 @@ function desenhaGrafico(dados, sec) {
        <text class="g-titulo-eixo2" x="${G.esq + pw + 8}" y="14">${esc(sec.coluna.rotulo)}</text>`
     : '';
 
+  GEO = {
+    banda,
+    topo: G.topo,
+    alturaPlot: ph,
+    rotulos: mostrados.map((p) => p.rotulo),
+    serie1: { nome: coluna.rotulo, tipo: coluna.tipo, valores },
+    serie2: sec ? { nome: sec.coluna.rotulo, tipo: sec.coluna.tipo, valores: sec.valores } : null,
+  };
+
   return `<svg viewBox="0 0 ${G.w} ${G.h}" class="emp-svg" role="img"
       aria-label="histórico de ${esc(coluna.rotulo)}${sec ? ` e ${esc(sec.coluna.rotulo)}` : ''}">
     ${grade}
+    <rect id="empFaixa" class="g-faixa oculto" y="${G.topo}" height="${ph}" width="${banda.toFixed(1)}" x="0"/>
     ${titulos}
     ${marcaMediana}
     ${camadas.map((c) => c.html).join('')}
@@ -656,9 +677,58 @@ function renderModal() {
   modalEl.hidden = false;
 }
 
+function escondeDica() {
+  dicaEl.hidden = true;
+  const faixa = modalEl.querySelector('#empFaixa');
+  if (faixa) faixa.classList.add('oculto');
+}
+
+// O SVG é responsivo (viewBox de 960 esticado até a largura da caixa), então a posição
+// do mouse vem em pixels de tela e volta para o sistema do desenho pela razão das larguras.
+function moveDica(ev) {
+  const svg = modalEl.querySelector('.emp-svg');
+  if (!svg || !GEO) return escondeDica();
+  const caixa = svg.getBoundingClientRect();
+  const escalaTela = caixa.width / G.w;
+  const x = (ev.clientX - caixa.left) / escalaTela;
+  const yDesenho = (ev.clientY - caixa.top) / escalaTela;
+  const i = Math.floor((x - G.esq) / GEO.banda);
+  const dentro = i >= 0 && i < GEO.rotulos.length
+    && yDesenho >= GEO.topo && yDesenho <= GEO.topo + GEO.alturaPlot;
+  if (!dentro) return escondeDica();
+
+  const faixa = svg.querySelector('#empFaixa');
+  if (faixa) {
+    faixa.setAttribute('x', (G.esq + GEO.banda * i).toFixed(1));
+    faixa.classList.remove('oculto');
+  }
+
+  const valor = (serie) => {
+    const v = serie.valores[i];
+    return v === null || v === undefined ? '—' : formata(v, serie.tipo);
+  };
+  const linhaSerie = (serie, classe) => `<div class="emp-dica-linha">
+      <i class="emp-dica-cor ${classe}"></i>
+      <span class="emp-dica-nome">${esc(serie.nome)}</span>
+      <span class="emp-dica-val">${valor(serie)}</span>
+    </div>`;
+  dicaEl.innerHTML = `<p class="emp-dica-per">${esc(GEO.rotulos[i])}</p>
+    ${linhaSerie(GEO.serie1, 'serie1')}
+    ${GEO.serie2 ? linhaSerie(GEO.serie2, 'serie2') : ''}`;
+
+  dicaEl.hidden = false;
+  const larg = dicaEl.offsetWidth;
+  const alt = dicaEl.offsetHeight;
+  dicaEl.style.left = `${Math.max(8, Math.min(ev.clientX + 16, innerWidth - larg - 8))}px`;
+  dicaEl.style.top = `${Math.max(8, Math.min(ev.clientY + 16, innerHeight - alt - 8))}px`;
+  return undefined;
+}
+
 function fechaGrafico() {
   modalEl.hidden = true;
   modalEl.innerHTML = '';
+  GEO = null;
+  escondeDica();
 }
 
 // ---- Abas ----

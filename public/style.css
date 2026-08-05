@@ -1452,6 +1452,51 @@ body.emp-arrastando { user-select: none; }
   font-size: 10.5px;
   text-anchor: middle;
 }
+/* faixa de realce do período sob o mouse, atrás das barras */
+.g-faixa { fill: var(--green-header); fill-opacity: 0.08; }
+.g-faixa.oculto { display: none; }
+
+.emp-dica-graf {
+  position: fixed;
+  z-index: 50;
+  pointer-events: none; /* senão o balão entra debaixo do mouse e o hover pisca */
+  min-width: 150px;
+  padding: 9px 11px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  font-size: 12px;
+}
+.emp-dica-graf[hidden] { display: none; }
+
+.emp-dica-per {
+  margin: 0 0 6px;
+  font-weight: 700;
+  color: var(--green-header);
+}
+
+.emp-dica-linha {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  line-height: 1.5;
+}
+.emp-dica-cor {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex: 0 0 10px;
+}
+.emp-dica-cor.serie1 { background: var(--green-header); }
+.emp-dica-cor.serie2 { background: var(--serie2); }
+.emp-dica-nome { color: var(--text-muted); }
+.emp-dica-val {
+  margin-left: auto;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 .g-mediana {
   stroke: var(--symbol-color);
   stroke-width: 1.4;
