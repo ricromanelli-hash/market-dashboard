@@ -1454,6 +1454,94 @@ async function carregaAgendaEmpresas() {
   cache.agendaEmpresas = { de, ate, eventos: lista };
 }
 
+// ---- Indicadores por empresa (re_kpi) ----
+// Alimenta a página aberta ao clicar num ticker da B3. A leitura usa o mesmo caminho da
+// agenda (PostgREST + chave anon), então depende de a re_kpi ter policy de SELECT para
+// `anon` — sem ela a consulta volta vazia, sem erro, que é como a RLS nega.
+const KPI_COLUNAS = [
+  'dt_refer', 'ano', 'tipo_demonstracao', 'denom_cia',
+  'receita_liquida', 'ebitda', 'margem_ebitda', 'deprecamortiz', 'ebit',
+  'resultado_financeiro', 'impostos', 'lucro_liquido', 'margem_liquida',
+  'plcontabil', 'roe', 'caixaequivalentes', 'aplicacoes', 'divida_bruta', 'dl_ebitda',
+  'fco_contabil', 'capex', 'fci_contabil', 'fcf_contabil', 'fcl_contabil',
+  'dividendos_pagos', 'payout', 'dy',
+].join(',');
+const KPI_ANOS = 10;                         // exercícios exibidos, além da linha TTM
+const KPI_CACHE_MS = 60 * 60 * 1000;         // balanço muda no máximo uma vez por trimestre
+const kpiCache = new Map();                  // ticker -> { quando, dados }
+
+const num = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
+const milhoes = (v) => (num(v) === null ? null : +(Number(v) / 1e6).toFixed(0));
+const pct = (v) => (num(v) === null ? null : +(Number(v) * 100).toFixed(1));
+
+function linhaKpi(r) {
+  const ebit = num(r.ebit);
+  const resFin = num(r.resultado_financeiro);
+  const impostos = num(r.impostos);
+  const lucro = num(r.lucro_liquido);
+  // A tabela não tem coluna de operações descontinuadas: é o que sobra entre o lucro
+  // líquido e o resultado antes dele (EBIT + financeiro + impostos).
+  const opDesc = [ebit, resFin, impostos, lucro].every((v) => v !== null)
+    ? lucro - (ebit + resFin + impostos)
+    : null;
+  const caixa = (num(r.caixaequivalentes) || 0) + (num(r.aplicacoes) || 0);
+  return {
+    data: r.dt_refer,
+    ano: r.ano,
+    ttm: r.tipo_demonstracao === 'ITR', // no ITR a re_kpi já guarda os últimos 12 meses
+    receita: milhoes(r.receita_liquida),
+    ebitda: milhoes(r.ebitda),
+    margemEbitda: pct(r.margem_ebitda),
+    da: milhoes(r.deprecamortiz) === null ? null : -Math.abs(milhoes(r.deprecamortiz)),
+    ebit: milhoes(r.ebit),
+    resFin: milhoes(r.resultado_financeiro),
+    impostos: milhoes(r.impostos),
+    opDesc: opDesc === null ? null : +(opDesc / 1e6).toFixed(0),
+    lucro: milhoes(r.lucro_liquido),
+    margemLiquida: pct(r.margem_liquida),
+    patrimonio: milhoes(r.plcontabil),
+    roe: pct(r.roe),
+    caixa: milhoes(caixa),
+    divida: milhoes(r.divida_bruta),
+    dlEbitda: num(r.dl_ebitda) === null ? null : +Number(r.dl_ebitda).toFixed(1),
+    fco: milhoes(r.fco_contabil),
+    capex: milhoes(r.capex),
+    fci: milhoes(r.fci_contabil),
+    fcf: milhoes(r.fcf_contabil),
+    fcl: milhoes(r.fcl_contabil),
+    proventos: milhoes(r.dividendos_pagos),
+    payout: pct(r.payout),
+    dy: pct(r.dy),
+  };
+}
+
+async function carregaIndicadores(ticker) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error('Supabase não configurado no servidor');
+  const papeis = await supabaseSelect('ac_ticker', `select=cd_cvm,nome_curto&ticker=eq.${ticker}&limit=1`);
+  if (!papeis.length) throw new Error(`Ticker ${ticker} não encontrado`);
+  const { cd_cvm: cvm, nome_curto: nomeCurto } = papeis[0];
+  const bruto = await supabaseSelect(
+    're_kpi',
+    `select=${KPI_COLUNAS}&cd_cvm=eq.${cvm}&order=dt_refer.desc&limit=40`,
+  );
+  if (!bruto.length) {
+    // Empresa sem histórico OU RLS barrando a leitura — a diferença não vem no corpo.
+    return { ticker, cvm, empresa: nomeCurto, linhas: [], vazio: true };
+  }
+  const ttm = bruto.find((r) => r.tipo_demonstracao === 'ITR');
+  const anuais = bruto.filter((r) => r.tipo_demonstracao === 'DFP').slice(0, KPI_ANOS);
+  // do mais antigo para o mais novo, com o TTM fechando a tabela
+  const linhas = [...anuais.reverse().map(linhaKpi)];
+  if (ttm) linhas.push(linhaKpi(ttm));
+  return {
+    ticker,
+    cvm,
+    empresa: bruto[0].denom_cia || nomeCurto,
+    unidade: 'R$ milhões',
+    linhas,
+  };
+}
+
 async function refreshSlowData() {
   // O CSV do Tesouro alimenta o IPCA+ 2032 e o 10 anos nominal do Brasil, que
   // refreshRealRates consome — por isso roda antes.
@@ -1489,6 +1577,21 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/data', (req, res) => {
   res.json({ ...cache, version: VERSION });
+});
+
+app.get('/api/empresa/:ticker', async (req, res) => {
+  // o ticker entra numa query PostgREST, então só passam letras e números
+  const ticker = String(req.params.ticker || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+  if (!ticker) return res.status(400).json({ error: 'ticker inválido' });
+  const emCache = kpiCache.get(ticker);
+  if (emCache && Date.now() - emCache.quando < KPI_CACHE_MS) return res.json(emCache.dados);
+  try {
+    const dados = await carregaIndicadores(ticker);
+    kpiCache.set(ticker, { quando: Date.now(), dados });
+    return res.json(dados);
+  } catch (err) {
+    return res.status(502).json({ error: err.message, ticker });
+  }
 });
 
 app.listen(PORT, async () => {

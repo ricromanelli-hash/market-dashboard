@@ -67,15 +67,21 @@ function renderQuoteRow(item) {
     const v12 = typeof item.chg12m === 'number'
       ? `<span class="row-12m ${item.chg12m >= 0 ? 'up' : 'down'}" title="variação em 12 meses">${item.chg12m >= 0 ? '+' : ''}${item.chg12m.toFixed(1)}%</span>`
       : '<span class="row-12m"></span>';
+    // Ações da B3 abrem a página de indicadores (re_kpi) numa aba nova. As de fora não
+    // têm CVM, então continuam como linha simples.
+    const ticker = item.symbol.endsWith('.SA') ? item.symbol.slice(0, -3) : null;
+    const abre = ticker
+      ? `<a class="row row-stock" href="empresa.html?ticker=${ticker}" target="_blank" rel="noopener" title="indicadores de ${ticker}">`
+      : '<div class="row row-stock">';
     return `
-      <div class="row row-stock">
+      ${abre}
         ${logo}
         ${nome}
         ${trend || '<span class="row-spark"></span>'}
         ${v12}
         ${preco}
         ${variacao}
-      </div>`;
+      ${ticker ? '</a>' : '</div>'}`;
   }
 
   // pré-abertura / after-market, quando disponível (ex.: EWZ)

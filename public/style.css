@@ -954,3 +954,128 @@ body.tv-mode .cal-widget-wrap iframe {
   height: 467px;
   transform-origin: top left;
 }
+
+/* ---- Linha de ação como link para a página de indicadores ---- */
+/* A linha virou <a> só nas ações da B3: sem isto herda sublinhado e azul do navegador
+   e destoa das linhas de fora, que continuam <div>. */
+a.row-stock {
+  text-decoration: none;
+  color: inherit;
+}
+a.row-stock:hover { background: #eef4ef; }
+/* na TV ninguém clica, e o realce piscaria com o mouse esquecido sobre o painel */
+body.tv-mode a.row-stock:hover { background: none; }
+
+/* ---- Página de indicadores da empresa (empresa.html) ---- */
+.emp-page { padding: 0 0 24px; }
+
+.emp-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 14px 20px;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.emp-topo h1 { margin: 0 0 4px; font-size: 20px; }
+
+.emp-sub {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.emp-voltar {
+  color: var(--symbol-color);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.emp-voltar:hover { text-decoration: underline; }
+
+/* 23 colunas não cabem em tela estreita: a tabela rola dentro da caixa, e só ela —
+   o corpo da página nunca ganha barra horizontal. */
+.emp-tabela-wrap {
+  margin: 20px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+.emp-tabela {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums; /* colunas de números alinham dígito a dígito */
+}
+
+.emp-tabela th {
+  color: #fff;
+  font-weight: 600;
+  font-size: 11px;
+  white-space: nowrap;
+  padding: 7px 8px;
+  text-align: right;
+  position: sticky;
+  top: 0; /* cabeçalho fixo na rolagem vertical */
+  z-index: 2;
+}
+
+.emp-tabela td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #f0f2ef;
+  white-space: nowrap;
+}
+
+.emp-tabela tbody tr:last-child td { border-bottom: none; }
+.emp-tabela tbody tr:nth-child(even) td { background: #fafbfa; }
+
+.emp-num { text-align: right; }
+.emp-num.neg { color: var(--red-down); }
+
+/* o ano acompanha a rolagem horizontal, senão some e não se sabe mais qual linha é qual */
+.emp-periodo {
+  text-align: left;
+  font-weight: 600;
+  position: sticky;
+  left: 0;
+  background: var(--card-bg);
+  z-index: 1;
+}
+.emp-tabela tbody tr:nth-child(even) .emp-periodo { background: #fafbfa; }
+.emp-tabela th.g-ano { left: 0; z-index: 3; }
+
+/* linha dos últimos 12 meses: é a única que não fecha exercício, então se destaca */
+.emp-ttm td {
+  font-weight: 700;
+  border-top: 2px solid var(--green-header);
+  background: #eef4ef !important;
+}
+
+/* faixas de cor por bloco do balanço: resultado, custo, patrimônio, dívida, caixa e proventos */
+.g-ano { background: var(--green-dark); }
+.g-resultado { background: var(--green-header); }
+.g-custo { background: #2d6b4f; }
+.g-balanco { background: #3c5f7a; }
+.g-divida { background: #8a4b3c; }
+.g-caixa { background: #2f6f70; }
+.g-provento { background: #5a4a7a; }
+
+.emp-aviso {
+  margin: 20px;
+  padding: 16px 18px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  max-width: 720px;
+}
+.emp-aviso p { margin: 0; font-size: 14px; }
+.emp-aviso-detalhe {
+  margin-top: 6px !important;
+  font-size: 12.5px !important;
+  color: var(--text-muted);
+}
