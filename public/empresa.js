@@ -926,6 +926,7 @@ const MODELOS = [
   { aba: 'eva', nome: 'Representatividade do Capital', chaves: ['patrimonio', 'divida'], tipo: 'empilhada' },
   { aba: 'eva', nome: 'Capital Próprio × Terceiros', chaves: ['percCp', 'percCt'], tipo: 'empilhada' },
   { aba: 'eva', nome: 'Custo de Capital', chaves: ['custoCp', 'custoCt', 'wacc'], tipo: 'linha' },
+  { aba: 'eva', nome: 'WACC', chaves: ['wacc'], tipo: 'barra' },
   // as parcelas do CAPM sem multiplicar o ERP pelo beta: o total da pilha é o custo de
   // capital próprio de mercado, igual para todas as empresas. O Ke da tabela, esse sim,
   // aplica o beta da empresa e por isso não bate com a soma.
