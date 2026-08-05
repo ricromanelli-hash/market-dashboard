@@ -1463,7 +1463,7 @@ const KPI_COLUNAS = [
   'receita_liquida', 'ebitda', 'margem_ebitda', 'deprecamortiz', 'ebit',
   'resultado_financeiro', 'impostos', 'lucro_liquido', 'margem_liquida',
   'plcontabil', 'roe', 'caixaequivalentes', 'aplicacoes', 'divida_bruta', 'dl_ebitda',
-  'fco_contabil', 'capex', 'fci_contabil', 'fcf_contabil', 'fcl_contabil',
+  'fco_contabil', 'capex', 'fci_contabil', 'fcf_contabil', 'fcl_contabil', 'fclyield',
   'dividendos_pagos', 'payout', 'dy',
 ].join(',');
 const KPI_ANOS = 10;                         // exercícios exibidos, além da linha TTM
@@ -1509,6 +1509,8 @@ function linhaKpi(r) {
     fci: milhoes(r.fci_contabil),
     fcf: milhoes(r.fcf_contabil),
     fcl: milhoes(r.fcl_contabil),
+    fclYield: pct(r.fclyield), // fração na re_kpi, como dy e roe
+
     proventos: milhoes(r.dividendos_pagos),
     payout: pct(r.payout),
     dy: pct(r.dy),

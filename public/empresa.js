@@ -41,6 +41,7 @@ const COLUNAS = [
   { chave: 'fci', rotulo: 'FC Invest', tipo: 'mi', grupo: 'caixa' },
   { chave: 'fcf', rotulo: 'FC Financ', tipo: 'mi', grupo: 'caixa' },
   { chave: 'fcl', rotulo: 'FC Livre', tipo: 'mi', grupo: 'caixa' },
+  { chave: 'fclYield', rotulo: 'FCL Yield', tipo: 'pct1', grupo: 'caixa' },
   { chave: 'proventos', rotulo: 'Proventos', tipo: 'mi', grupo: 'provento' },
   { chave: 'payout', rotulo: 'Payout', tipo: 'pct0', grupo: 'provento' },
   { chave: 'dy', rotulo: 'DY', tipo: 'pct1', grupo: 'provento' },
