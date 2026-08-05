@@ -1102,6 +1102,96 @@ body.tv-mode a.row-stock:hover { background: none; }
 }
 .emp-intervalo-erro { color: var(--red-down); }
 
+.emp-dica {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ---- Arrasto dentro de uma coluna ---- */
+.emp-tabela tbody td { cursor: cell; }
+/* enquanto arrasta, o navegador ainda tentaria selecionar texto ao passar pelas células */
+body.emp-arrastando { user-select: none; }
+
+.emp-tabela tbody td.emp-arrasto,
+.emp-tabela tbody tr.emp-marcado td.emp-arrasto {
+  background: #dbe9f5;
+  box-shadow: inset 1px 0 0 #7ba7cc, inset -1px 0 0 #7ba7cc;
+}
+
+.emp-balao {
+  position: fixed;
+  z-index: 20;
+  min-width: 190px;
+  padding: 12px 14px 10px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.16);
+  font-size: 12.5px;
+}
+.emp-balao[hidden] { display: none; }
+
+.emp-balao p { margin: 0; }
+
+.emp-balao-x {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.emp-balao-x:hover { color: var(--text); }
+
+.emp-balao-tit {
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--green-header);
+  padding-right: 16px; /* não passa por baixo do × */
+}
+
+.emp-balao-per {
+  color: var(--text-muted);
+  font-size: 11.5px;
+  margin-top: 2px !important;
+}
+
+.emp-balao-val {
+  margin-top: 6px !important;
+  font-variant-numeric: tabular-nums;
+}
+.emp-balao-un { color: var(--text-muted); font-size: 11px; }
+
+.emp-balao-res {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 2px 12px;
+  margin: 8px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.emp-balao-res dt { color: var(--text-muted); }
+.emp-balao-res dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.emp-balao-res dd.neg { color: var(--red-down); }
+
+.emp-balao-nota {
+  margin-top: 8px !important;
+  font-size: 11px;
+  color: var(--text-muted);
+  max-width: 230px;
+}
+
 /* ---- Linhas de variação no rodapé da tabela ---- */
 .emp-tabela tfoot td {
   background: #eef4ef;

@@ -7,6 +7,7 @@ const TICKER = (params.get('ticker') || '').toUpperCase().replace(/[^A-Z0-9]/g, 
 const tituloEl = document.getElementById('empTitulo');
 const subEl = document.getElementById('empSub');
 const controlesEl = document.getElementById('empControles');
+const balaoEl = document.getElementById('empBalao');
 const conteudoEl = document.getElementById('empConteudo');
 
 const fmtMi = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
@@ -87,6 +88,13 @@ const razaoValida = (a, b) => a !== 0 && b !== 0 && Math.sign(a) === Math.sign(b
 
 const comSinal = (v, sufixo) => `${v >= 0 ? '+' : ''}${fmt1.format(v)}${sufixo}`;
 
+// "9 anos" quando fecha redondo; "4,2 anos" quando uma das pontas é o TTM
+function textoAnos(anos) {
+  const arredondado = Math.round(anos);
+  const txt = Math.abs(anos - arredondado) < 0.05 ? String(arredondado) : fmt1.format(anos);
+  return `${txt} ano${txt === '1' ? '' : 's'}`;
+}
+
 function celulaVariacao(coluna, ini, fim, anos, modo) {
   const a = ini[coluna.chave];
   const b = fim[coluna.chave];
@@ -140,14 +148,128 @@ function atualizaVariacao() {
     rodape.innerHTML = '';
     return;
   }
-  // "8 anos" quando fecha redondo; "8,3 anos" quando uma das pontas é o TTM
-  const arredondado = Math.round(anos);
-  const txtAnos = Math.abs(anos - arredondado) < 0.05 ? String(arredondado) : fmt1.format(anos);
-  intervalo.textContent = `${periodo(ini)} → ${periodo(fim)} (${txtAnos} ano${txtAnos === '1' ? '' : 's'})`;
+  intervalo.textContent = `${periodo(ini)} → ${periodo(fim)} (${textoAnos(anos)})`;
   intervalo.classList.remove('emp-intervalo-erro');
 
   rodape.innerHTML = linhaVariacao('Var. total', 'total', ini, fim, anos)
     + linhaVariacao('CAGR a.a.', 'cagr', ini, fim, anos);
+}
+
+function aplicaPeriodo(de, ate) {
+  document.getElementById('empDe').value = String(de);
+  document.getElementById('empAte').value = String(ate);
+  atualizaVariacao();
+}
+
+// ---- Seleção por arrasto: segurar o botão numa célula e soltar noutra ----
+// O arrasto anda só na coluna onde começou: CAGR compara o mesmo indicador em dois
+// momentos, então cruzar colunas (receita de 2018 contra dívida de 2024) não teria conta.
+
+let arrasto = null;
+
+function celulaDoEvento(ev) {
+  const td = ev.target.closest('td');
+  if (!td || !conteudoEl.contains(td)) return null;
+  const tr = td.parentElement;
+  if (tr.dataset.i === undefined) return null; // rodapé e cabeçalho ficam de fora
+  return { i: Number(tr.dataset.i), coluna: [...tr.children].indexOf(td) };
+}
+
+function pintaArrasto(coluna, a, b) {
+  conteudoEl.querySelectorAll('td.emp-arrasto').forEach((td) => td.classList.remove('emp-arrasto'));
+  if (coluna === null) return;
+  for (let i = Math.min(a, b); i <= Math.max(a, b); i += 1) {
+    const tr = conteudoEl.querySelector(`tbody tr[data-i="${i}"]`);
+    const td = tr && tr.children[coluna];
+    if (td) td.classList.add('emp-arrasto');
+  }
+}
+
+function fechaBalao() {
+  balaoEl.hidden = true;
+  balaoEl.innerHTML = '';
+}
+
+function mostraBalao(coluna, de, ate, x, y) {
+  const c = COLUNAS[coluna];
+  const ini = DADOS.linhas[de];
+  const fim = DADOS.linhas[ate];
+  const anos = anosEntre(ini, fim);
+  if (!c || !anos || anos <= 0) return fechaBalao();
+
+  const cabecalho = `
+    <button type="button" class="emp-balao-x" aria-label="fechar">×</button>
+    <p class="emp-balao-tit">${esc(c.rotulo)}</p>
+    <p class="emp-balao-per">${esc(periodo(ini))} → ${esc(periodo(fim))} · ${textoAnos(anos)}</p>`;
+
+  if (c.tipo === 'texto') {
+    // arrasto na coluna do ano: serve para marcar o período, mas não há o que calcular
+    balaoEl.innerHTML = `${cabecalho}
+      <p class="emp-balao-nota">Período marcado. Arraste numa coluna de valores para ver o CAGR.</p>`;
+  } else {
+    const total = celulaVariacao(c, ini, fim, anos, 'total');
+    const cagr = celulaVariacao(c, ini, fim, anos, 'cagr');
+    const unidade = c.tipo === 'mi' ? ` <span class="emp-balao-un">${esc(DADOS.unidade)}</span>` : '';
+    const nota = cagr.dica || total.dica;
+    balaoEl.innerHTML = `${cabecalho}
+      <p class="emp-balao-val">${formata(ini[c.chave], c.tipo)} → ${formata(fim[c.chave], c.tipo)}${unidade}</p>
+      <dl class="emp-balao-res">
+        <dt>Var. total</dt><dd class="${typeof total.valor === 'number' && total.valor < 0 ? 'neg' : ''}">${total.texto}</dd>
+        <dt>CAGR a.a.</dt><dd class="${typeof cagr.valor === 'number' && cagr.valor < 0 ? 'neg' : ''}">${cagr.texto}</dd>
+      </dl>
+      ${nota ? `<p class="emp-balao-nota">${esc(nota)}</p>` : ''}`;
+  }
+
+  // solto perto da borda, o balão sairia da tela: encosta na margem em vez de vazar
+  balaoEl.hidden = false;
+  const larg = balaoEl.offsetWidth;
+  const alt = balaoEl.offsetHeight;
+  balaoEl.style.left = `${Math.max(8, Math.min(x + 14, innerWidth - larg - 8))}px`;
+  balaoEl.style.top = `${Math.max(8, Math.min(y + 14, innerHeight - alt - 8))}px`;
+  return undefined;
+}
+
+function ligaArrasto() {
+  conteudoEl.addEventListener('mousedown', (ev) => {
+    if (ev.button !== 0) return;
+    const c = celulaDoEvento(ev);
+    if (!c) return;
+    ev.preventDefault(); // sem isto o navegador começa a selecionar o texto da tabela
+    fechaBalao();
+    arrasto = { coluna: c.coluna, iInicio: c.i, iAtual: c.i };
+    document.body.classList.add('emp-arrastando');
+    pintaArrasto(c.coluna, c.i, c.i);
+  });
+
+  conteudoEl.addEventListener('mouseover', (ev) => {
+    if (!arrasto) return;
+    const c = celulaDoEvento(ev);
+    if (!c) return;
+    arrasto.iAtual = c.i; // a coluna é a do início; só a linha acompanha o mouse
+    pintaArrasto(arrasto.coluna, arrasto.iInicio, c.i);
+  });
+
+  // no document: soltar o botão fora da tabela também encerra o arrasto
+  document.addEventListener('mouseup', (ev) => {
+    if (!arrasto) return;
+    const { coluna, iInicio, iAtual } = arrasto;
+    arrasto = null;
+    document.body.classList.remove('emp-arrastando');
+    pintaArrasto(null);
+    if (iInicio === iAtual) return; // clique seco, sem arrastar: nada a comparar
+    const de = Math.min(iInicio, iAtual);
+    const ate = Math.max(iInicio, iAtual);
+    aplicaPeriodo(de, ate);
+    mostraBalao(coluna, de, ate, ev.clientX, ev.clientY);
+  });
+
+  balaoEl.addEventListener('click', (ev) => {
+    if (ev.target.closest('.emp-balao-x')) fechaBalao();
+  });
+
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape') fechaBalao();
+  });
 }
 
 function opcoes(linhas, selecionado) {
@@ -163,7 +285,8 @@ function renderControles(linhas) {
   controlesEl.innerHTML = `
     <label class="emp-ctrl">De <select id="empDe">${opcoes(linhas, 0)}</select></label>
     <label class="emp-ctrl">Até <select id="empAte">${opcoes(linhas, ultimoExercicio)}</select></label>
-    <span id="empIntervalo" class="emp-intervalo"></span>`;
+    <span id="empIntervalo" class="emp-intervalo"></span>
+    <span class="emp-dica">ou arraste o mouse dentro de uma coluna</span>`;
   document.getElementById('empDe').addEventListener('change', atualizaVariacao);
   document.getElementById('empAte').addEventListener('change', atualizaVariacao);
   controlesEl.hidden = false;
@@ -224,6 +347,7 @@ async function carrega() {
     if (dados.linhas.length > 1) {
       renderControles(dados.linhas);
       atualizaVariacao();
+      ligaArrasto();
     }
   } catch (err) {
     subEl.textContent = '';
