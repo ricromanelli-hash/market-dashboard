@@ -106,6 +106,8 @@ const COLUNAS_EVA = [
   { chave: 'erp', rotulo: 'ERP', tipo: 'pct1', grupo: 'divida' },
   { chave: 'riscoPais', rotulo: 'Risco País', tipo: 'pct1', grupo: 'divida' },
   { chave: 'difInflacao', rotulo: 'Dif Inflação', tipo: 'pct1', grupo: 'divida' },
+  // soma das quatro parcelas acima (CAPM sem beta); a coluna Ke ao lado aplica o beta
+  { chave: 'keCapm', rotulo: 'Ke CAPM', tipo: 'pct1', grupo: 'divida' },
   { chave: 'custoKe', rotulo: 'Ke', tipo: 'pct1', grupo: 'divida' },
   { chave: 'custoCp', rotulo: 'Custo CP 10a', tipo: 'pct1', grupo: 'divida' },
   { chave: 'custoCt', rotulo: 'Custo CT', tipo: 'pct1', grupo: 'divida' },

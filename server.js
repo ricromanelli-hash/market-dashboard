@@ -1593,6 +1593,11 @@ function linhaKpi(r) {
   linha.opDesc = opDesc === null ? null : +(opDesc / 1e6).toFixed(0);
   // caixa da aba de indicadores soma as aplicações; a do EVA é só o disponível
   linha.caixa = milhoes((num(r.caixaequivalentes) || 0) + (num(r.aplicacoes) || 0));
+  // Custo de capital próprio pelo CAPM, somando as parcelas de mercado. Soma dos valores
+  // crus, não dos já arredondados para uma casa, senão o total foge do que a conta dá.
+  // Se qualquer parcela faltar a soma seria menor do que o custo real, então vira nulo.
+  const capm = [r.taxalivrederisco, r.erp, r.rbr, r.dif_inflacao].map(num);
+  linha.keCapm = capm.every((v) => v !== null) ? pct(capm.reduce((s, v) => s + v, 0)) : null;
   return linha;
 }
 
