@@ -359,13 +359,20 @@ function ligaArrasto() {
     const i = [...th.parentElement.children].indexOf(th);
     if (!COLUNAS()[i] || COLUNAS()[i].tipo === 'texto') return;
     grafico.coluna = i;
-    if (grafico.secundaria === i) grafico.secundaria = null; // não se compara consigo mesmo
+    grafico.series = grafico.series.filter((s) => s !== i); // não se compara consigo mesmo
     renderModal();
   });
 
   modalEl.addEventListener('click', (ev) => {
     if (ev.target.closest('.emp-modal-x') || ev.target.classList.contains('emp-modal-fundo')) {
       fechaGrafico();
+      return;
+    }
+    const tirar = ev.target.closest('[data-remover]');
+    if (tirar) {
+      const i = Number(tirar.dataset.remover);
+      grafico.series = grafico.series.filter((s) => s !== i);
+      renderModal();
       return;
     }
     const botao = ev.target.closest('.emp-seg button');
@@ -383,8 +390,10 @@ function ligaArrasto() {
 
   modalEl.addEventListener('change', (ev) => {
     if (ev.target.id === 'empAnom') grafico.ignorar = ev.target.checked;
-    else if (ev.target.id === 'empComp') grafico.secundaria = ev.target.value === '' ? null : Number(ev.target.value);
-    else return;
+    else if (ev.target.id === 'empComp') {
+      if (ev.target.value === '') return;
+      grafico.series = [...grafico.series, Number(ev.target.value)];
+    } else return;
     renderModal();
   });
 
@@ -399,7 +408,7 @@ function ligaArrasto() {
 
 // `ignorar` começa ligado porque um único exercício atípico (P/L num ano de prejuízo,
 // margem sobre base quase zero) estica a escala e achata todo o resto do gráfico.
-const grafico = { coluna: null, secundaria: null, tipo: 'barra', ignorar: true, anos: 'tudo' };
+const grafico = { coluna: null, series: [], tipo: 'barra', ignorar: true, anos: 'tudo' };
 
 const JANELAS = [5, 10, 15];
 
@@ -497,44 +506,105 @@ function serieAlinhada(indice, mostrados) {
   return { coluna, valores, presentes: valores.filter((v) => v !== null) };
 }
 
-// Uma série vira barras ou linha conforme `estilo`. Com dois indicadores o segundo pega
-// sempre o estilo oposto ao do primeiro — duas linhas ou duas barras se confundiriam.
-function desenhaSerie(pontos, estilo, y, cx, banda, sufixo) {
-  const validos = pontos.map((v, i) => ({ v, i })).filter((p) => p.v !== null);
+const CORES = 6; // --c0 a --c5 no CSS; a partir da sexta série a paleta repete
+const numero = (v) => typeof v === 'number';
+
+// pct0 e pct1 são a mesma unidade, só mudam as casas decimais
+const unidade = (tipo) => (tipo === 'pct0' || tipo === 'pct1' ? 'pct' : tipo);
+const mesmaUnidade = (a, b) => unidade(a) === unidade(b);
+
+// A primeira série é sempre a coluna clicada; as demais vêm do seletor, na ordem em
+// que foram adicionadas (que é a ordem em que empilham, de baixo para cima).
+function seriesDoGrafico(dados) {
+  return [grafico.coluna, ...grafico.series].map((indice, ordem) => ({
+    coluna: COLUNAS()[indice],
+    valores: ordem === 0
+      ? dados.mostrados.map((p) => p.valor)
+      : serieAlinhada(indice, dados.mostrados).valores,
+    cor: ordem % CORES,
+  }));
+}
+
+function desenhaLinha(serie, y, cx) {
+  const validos = serie.valores.map((v, i) => ({ v, i })).filter((p) => numero(p.v));
   if (!validos.length) return '';
-  if (estilo === 'linha') {
-    const pts = validos.map((p) => `${cx(p.i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
-    return `<polyline class="g-linha${sufixo}" fill="none" points="${pts}"/>
-      ${validos.map((p) => `<circle class="g-ponto${sufixo}" cx="${cx(p.i).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="3.5"/>`).join('')}`;
-  }
-  const largura = Math.min(46, banda * 0.62);
+  const pts = validos.map((p) => `${cx(p.i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
+  return `<polyline class="g-linha g-s${serie.cor}" points="${pts}"/>
+    ${validos.map((p) => `<circle class="g-ponto g-s${serie.cor}" cx="${cx(p.i).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="3.5"/>`).join('')}`;
+}
+
+// `fatias` maior que 1 reparte a banda entre as séries, lado a lado
+function desenhaBarras(serie, y, cx, banda, fatias, posicao) {
+  const largura = Math.min(46, banda * 0.62) / fatias;
+  const desloc = (posicao - (fatias - 1) / 2) * largura;
   const y0 = y(0);
-  return validos.map((p) => {
-    const yv = y(p.v);
-    return `<rect class="g-barra${sufixo}${p.v < 0 ? ' neg' : ''}" x="${(cx(p.i) - largura / 2).toFixed(1)}"
+  return serie.valores.map((v, i) => {
+    if (!numero(v)) return '';
+    const yv = y(v);
+    return `<rect class="g-barra g-s${serie.cor}${fatias === 1 && v < 0 ? ' neg' : ''}" x="${(cx(i) + desloc - largura / 2).toFixed(1)}"
       y="${Math.min(yv, y0).toFixed(1)}" width="${largura.toFixed(1)}"
       height="${Math.max(Math.abs(yv - y0), 1).toFixed(1)}" rx="2"/>`;
   }).join('');
 }
 
-function desenhaGrafico(dados, sec) {
-  const { coluna, mostrados } = dados;
+// Positivos sobem a partir do zero, negativos descem: uma pilha com sinais trocados
+// que empilhasse tudo na mesma direção mostraria um total que não existe.
+function desenhaPilha(series, y, cx, banda, i) {
+  const largura = Math.min(46, banda * 0.62);
+  let cima = 0;
+  let baixo = 0;
+  return series.map((s) => {
+    const v = s.valores[i];
+    if (!numero(v) || v === 0) return '';
+    const de = v >= 0 ? cima : baixo;
+    const ate = de + v;
+    if (v >= 0) cima = ate; else baixo = ate;
+    const topo = y(Math.max(de, ate));
+    const base = y(Math.min(de, ate));
+    return `<rect class="g-barra g-s${s.cor}" x="${(cx(i) - largura / 2).toFixed(1)}"
+      y="${topo.toFixed(1)}" width="${largura.toFixed(1)}" height="${Math.max(base - topo, 1).toFixed(1)}"/>`;
+  }).join('');
+}
+
+function desenhaGrafico(dados) {
+  const { mostrados } = dados;
   if (!mostrados.length) return '<p class="emp-grafico-vazio">Sem valores para este indicador.</p>';
 
-  const valores = mostrados.map((p) => p.valor);
-  const mediana = quantil([...valores].sort((a, b) => a - b), 0.5);
-  const escala = escalaY([...valores, mediana]);
+  const series = seriesDoGrafico(dados);
+  const empilhada = grafico.tipo === 'empilhada';
+  // Dois eixos só cabem com duas séries. Com três ou mais não há margem para outro eixo,
+  // e empilhar exige escala única de qualquer jeito — a soma precisa ter significado.
+  const duplo = series.length === 2 && !empilhada;
+  const principal = series[0];
+
   const pw = G.w - G.esq - G.dir;
   const ph = G.h - G.topo - G.base;
-  const y = (v) => G.topo + ph - ((v - escala.min) / (escala.max - escala.min)) * ph;
   const banda = pw / mostrados.length;
   const cx = (i) => G.esq + banda * (i + 0.5);
-  const rotulo = (v) => formata(+v.toFixed(6), coluna.tipo);
+  const mediana = quantil([...principal.valores].sort((a, b) => a - b), 0.5);
 
-  // eixo da direita só existe com o segundo indicador, e com as mesmas faixas da esquerda
-  const escala2 = sec && sec.presentes.length ? escalaY(sec.presentes) : null;
+  const pilhas = empilhada ? mostrados.map((_, i) => {
+    let pos = 0;
+    let neg = 0;
+    series.forEach((s) => {
+      const v = s.valores[i];
+      if (numero(v)) { if (v >= 0) pos += v; else neg += v; }
+    });
+    return { pos, neg, total: pos + neg };
+  }) : null;
+
+  let escala;
+  if (empilhada) escala = escalaY(pilhas.flatMap((p) => [p.pos, p.neg]));
+  else if (duplo) escala = escalaY([...principal.valores, mediana]);
+  else escala = escalaY([...series.flatMap((s) => s.valores).filter(numero), mediana]);
+
+  const escala2 = duplo && series[1].valores.some(numero)
+    ? escalaY(series[1].valores.filter(numero))
+    : null;
+
+  const y = (v) => G.topo + ph - ((v - escala.min) / (escala.max - escala.min)) * ph;
   const y2 = (v) => G.topo + ph - ((v - escala2.min) / (escala2.max - escala2.min)) * ph;
-  const rotulo2 = (v) => (sec ? formata(+v.toFixed(6), sec.coluna.tipo) : '');
+  const rotulo = (v) => formata(+v.toFixed(6), principal.coluna.tipo);
 
   let grade = '';
   for (let k = 0; k <= FAIXAS; k += 1) {
@@ -544,39 +614,59 @@ function desenhaGrafico(dados, sec) {
       <text class="g-eixo" x="${G.esq - 8}" y="${y(v) + 3.5}">${rotulo(v)}</text>`;
     if (escala2) {
       const v2 = escala2.min + k * escala2.passo;
-      grade += `<text class="g-eixo2" x="${G.esq + pw + 8}" y="${y(v) + 3.5}">${rotulo2(v2)}</text>`;
+      grade += `<text class="g-eixo2" x="${G.esq + pw + 8}" y="${y(v) + 3.5}">${formata(+v2.toFixed(6), series[1].coluna.tipo)}</text>`;
     }
   }
 
-  const estilo2 = grafico.tipo === 'linha' ? 'barra' : 'linha';
-  // o que for barra vai primeiro, para a linha do outro indicador não ficar por baixo
-  const camadas = [
-    { html: desenhaSerie(valores, grafico.tipo, y, cx, banda, ''), estilo: grafico.tipo },
-    escala2
-      ? { html: desenhaSerie(sec.valores, estilo2, y2, cx, banda, '2'), estilo: estilo2 }
-      : null,
-  ].filter(Boolean).sort((a, b) => (a.estilo === 'barra' ? -1 : 1) - (b.estilo === 'barra' ? -1 : 1));
+  let desenho;
+  if (empilhada) {
+    desenho = mostrados.map((_, i) => desenhaPilha(series, y, cx, banda, i)).join('');
+  } else if (duplo) {
+    // eixo duplo pede barra + linha: duas barras com escalas diferentes lado a lado
+    // convidam a comparar alturas que não são comparáveis
+    desenho = grafico.tipo === 'linha'
+      ? desenhaBarras(series[1], y2, cx, banda, 1, 0) + desenhaLinha(principal, y, cx)
+      : desenhaBarras(principal, y, cx, banda, 1, 0) + desenhaLinha(series[1], y2, cx);
+  } else if (grafico.tipo === 'linha') {
+    desenho = series.map((s) => desenhaLinha(s, y, cx)).join('');
+  } else {
+    desenho = series.map((s, k) => desenhaBarras(s, y, cx, banda, series.length, k)).join('');
+  }
 
-  // com duas séries o rótulo em cada ponto vira ruído; a leitura passa a ser pelos eixos
-  const valoresEsc = sec ? '' : mostrados.map((p, i) => {
-    const dy = p.valor >= 0 ? -7 : 13; // por fora da barra: por dentro some nas curtas
-    return `<text class="g-valor" x="${cx(i).toFixed(1)}" y="${(y(p.valor) + dy).toFixed(1)}">${rotulo(p.valor)}</text>`;
-  }).join('');
+  // Um indicador: valor em cada ponto. Empilhada: o total da pilha, que é o que a
+  // soma quer dizer. Nos outros casos o rótulo por série vira ruído.
+  let rotulosValor = '';
+  if (series.length === 1) {
+    rotulosValor = mostrados.map((p, i) => {
+      const dy = p.valor >= 0 ? -7 : 13; // por fora da barra: por dentro some nas curtas
+      return `<text class="g-valor" x="${cx(i).toFixed(1)}" y="${(y(p.valor) + dy).toFixed(1)}">${rotulo(p.valor)}</text>`;
+    }).join('');
+  } else if (empilhada) {
+    rotulosValor = pilhas.map((p, i) => {
+      const topo = p.pos !== 0 || p.neg === 0 ? p.pos : p.neg;
+      const dy = topo >= 0 ? -7 : 13;
+      return `<text class="g-valor" x="${cx(i).toFixed(1)}" y="${(y(topo) + dy).toFixed(1)}">${rotulo(p.total)}</text>`;
+    }).join('');
+  }
 
   const periodos = mostrados
     .map((p, i) => `<text class="g-periodo" x="${cx(i).toFixed(1)}" y="${G.topo + ph + 18}">${esc(p.rotulo)}</text>`)
     .join('');
 
-  // sem segundo indicador a margem direita é do rótulo da mediana; com ele, do eixo
-  const marcaMediana = escala2
-    ? `<line class="g-mediana" x1="${G.esq}" y1="${y(mediana).toFixed(1)}" x2="${G.esq + pw}" y2="${y(mediana).toFixed(1)}"/>`
-    : `<line class="g-mediana" x1="${G.esq}" y1="${y(mediana).toFixed(1)}" x2="${G.esq + pw + 6}" y2="${y(mediana).toFixed(1)}"/>
-       <text class="g-mediana-rot" x="${G.esq + pw + 10}" y="${(y(mediana) - 2).toFixed(1)}">mediana</text>
-       <text class="g-mediana-val" x="${G.esq + pw + 10}" y="${(y(mediana) + 11).toFixed(1)}">${rotulo(mediana)}</text>`;
+  // Na empilhada a mediana é de uma série só contra uma escala de somas: não diz nada.
+  // Sem eixo à direita, a margem sobra para o rótulo dela.
+  let marcaMediana = '';
+  if (!empilhada) {
+    marcaMediana = escala2
+      ? `<line class="g-mediana" x1="${G.esq}" y1="${y(mediana).toFixed(1)}" x2="${G.esq + pw}" y2="${y(mediana).toFixed(1)}"/>`
+      : `<line class="g-mediana" x1="${G.esq}" y1="${y(mediana).toFixed(1)}" x2="${G.esq + pw + 6}" y2="${y(mediana).toFixed(1)}"/>
+         <text class="g-mediana-rot" x="${G.esq + pw + 10}" y="${(y(mediana) - 2).toFixed(1)}">mediana</text>
+         <text class="g-mediana-val" x="${G.esq + pw + 10}" y="${(y(mediana) + 11).toFixed(1)}">${rotulo(mediana)}</text>`;
+  }
 
   const titulos = escala2
-    ? `<text class="g-titulo-eixo" x="${G.esq - 8}" y="14">${esc(coluna.rotulo)}</text>
-       <text class="g-titulo-eixo2" x="${G.esq + pw + 8}" y="14">${esc(sec.coluna.rotulo)}</text>`
+    ? `<text class="g-titulo-eixo" x="${G.esq - 8}" y="14">${esc(principal.coluna.rotulo)}</text>
+       <text class="g-titulo-eixo2" x="${G.esq + pw + 8}" y="14">${esc(series[1].coluna.rotulo)}</text>`
     : '';
 
   GEO = {
@@ -584,18 +674,19 @@ function desenhaGrafico(dados, sec) {
     topo: G.topo,
     alturaPlot: ph,
     rotulos: mostrados.map((p) => p.rotulo),
-    serie1: { nome: coluna.rotulo, tipo: coluna.tipo, valores },
-    serie2: sec ? { nome: sec.coluna.rotulo, tipo: sec.coluna.tipo, valores: sec.valores } : null,
+    series: series.map((s) => ({ nome: s.coluna.rotulo, tipo: s.coluna.tipo, valores: s.valores, cor: s.cor })),
+    totais: pilhas ? pilhas.map((p) => p.total) : null,
+    tipoTotal: principal.coluna.tipo,
   };
 
   return `<svg viewBox="0 0 ${G.w} ${G.h}" class="emp-svg" role="img"
-      aria-label="histórico de ${esc(coluna.rotulo)}${sec ? ` e ${esc(sec.coluna.rotulo)}` : ''}">
+      aria-label="histórico de ${esc(series.map((s) => s.coluna.rotulo).join(', '))}">
     ${grade}
     <rect id="empFaixa" class="g-faixa oculto" y="${G.topo}" height="${ph}" width="${banda.toFixed(1)}" x="0"/>
     ${titulos}
     ${marcaMediana}
-    ${camadas.map((c) => c.html).join('')}
-    ${valoresEsc}
+    ${desenho}
+    ${rotulosValor}
     ${periodos}
   </svg>`;
 }
@@ -618,24 +709,53 @@ function renderModal() {
     nota = 'Períodos de menos para avaliar anomalias — o filtro precisa de pelo menos 5.';
   }
 
+  // Séries que dividem o mesmo eixo precisam da mesma unidade: somar (ou comparar altura
+  // de) um percentual com um valor em milhões não diz nada — empilhar Mrg Bruta com
+  // Impostos dava um "total" de −3.541%. Com duas séries o eixo duplo resolve; a partir
+  // da terceira, e sempre na empilhada, a unidade tem que bater com a do indicador clicado.
+  const divideEixo = grafico.tipo === 'empilhada' || grafico.series.length >= 2;
+  let expulsas = 0;
+  if (divideEixo) {
+    const antes = grafico.series.length;
+    grafico.series = grafico.series.filter((i) => mesmaUnidade(COLUNAS()[i].tipo, coluna.tipo));
+    expulsas = antes - grafico.series.length;
+  }
+
+  let notaSeries = '';
+  if (expulsas) {
+    notaSeries = ` ${expulsas} indicador${expulsas > 1 ? 'es saíram' : ' saiu'} do gráfico: aqui as séries dividem o mesmo eixo, e só entram as da mesma unidade do indicador clicado.`;
+  } else if (grafico.series.length) {
+    if (grafico.tipo === 'empilhada') {
+      notaSeries = ' Empilhada: todos dividem a mesma escala e o rótulo em cima é a soma do período.';
+    } else if (grafico.series.length === 1) {
+      notaSeries = ' Os tiles e a mediana são do indicador clicado; o segundo tem eixo próprio à direita.';
+    } else {
+      notaSeries = ' Com três ou mais indicadores todos dividem a escala da esquerda; os tiles e a mediana são do clicado.';
+    }
+  }
+
   // exercícios disponíveis: não adianta oferecer 15 anos para quem só tem 8 na base
   const exercicios = DADOS.linhas.filter((l) => !l.ttm).length;
   const opcoesJanela = [...JANELAS.filter((n) => n < exercicios), 'tudo']
     .map((n) => `<button type="button" data-anos="${n}"${String(grafico.anos) === String(n) ? ' class="ativo"' : ''}>${n === 'tudo' ? 'Tudo' : `${n} anos`}</button>`)
     .join('');
 
-  const sec = grafico.secundaria === null ? null : serieAlinhada(grafico.secundaria, dados.mostrados);
+  const usadas = [grafico.coluna, ...grafico.series];
+  // a próxima a entrar já divide eixo se for a terceira, ou se o gráfico for empilhado
+  const proximaDivideEixo = grafico.tipo === 'empilhada' || grafico.series.length >= 1;
   const opcoesComp = COLUNAS()
     .map((c, i) => ({ c, i }))
-    .filter(({ c, i }) => c.tipo !== 'texto' && i !== grafico.coluna)
-    .map(({ c, i }) => `<option value="${i}"${i === grafico.secundaria ? ' selected' : ''}>${esc(c.rotulo)}</option>`)
+    .filter(({ c, i }) => c.tipo !== 'texto' && !usadas.includes(i)
+      && (!proximaDivideEixo || mesmaUnidade(c.tipo, coluna.tipo)))
+    .map(({ c, i }) => `<option value="${i}">${esc(c.rotulo)}</option>`)
     .join('');
-  const legenda = sec
-    ? `<div class="emp-legenda">
-        <span class="emp-leg"><i class="emp-leg-cor ${grafico.tipo === 'linha' ? 'linha' : 'barra'}"></i>${esc(coluna.rotulo)}</span>
-        <span class="emp-leg"><i class="emp-leg-cor ${grafico.tipo === 'linha' ? 'barra2' : 'linha2'}"></i>${esc(sec.coluna.rotulo)}</span>
-      </div>`
-    : '';
+  // o indicador clicado abre a lista e não sai por aqui: para trocá-lo, clica-se noutra coluna
+  const fichas = usadas.map((i, ordem) => {
+    const c = COLUNAS()[i];
+    const cor = `var(--c${ordem % CORES})`;
+    const x = ordem === 0 ? '' : `<button type="button" class="emp-ficha-x" data-remover="${i}" aria-label="tirar ${esc(c.rotulo)}">×</button>`;
+    return `<span class="emp-ficha"><i class="emp-ficha-cor" style="background:${cor}"></i>${esc(c.rotulo)}${x}</span>`;
+  }).join('');
 
   modalEl.innerHTML = `
     <div class="emp-modal-fundo"></div>
@@ -656,6 +776,7 @@ function renderModal() {
         <div class="emp-seg emp-modal-tipo">
           <button type="button" data-tipo="linha"${grafico.tipo === 'linha' ? ' class="ativo"' : ''}>Linhas</button>
           <button type="button" data-tipo="barra"${grafico.tipo === 'barra' ? ' class="ativo"' : ''}>Barra</button>
+          <button type="button" data-tipo="empilhada"${grafico.tipo === 'empilhada' ? ' class="ativo"' : ''}>Empilhada</button>
         </div>
       </div>
       <div class="emp-tiles">
@@ -663,16 +784,15 @@ function renderModal() {
         ${tile('Mediana', quantil(ordenados, 0.5), coluna.tipo)}
         ${tile('Média', media(valores), coluna.tipo)}
       </div>
-      <label class="emp-modal-comp">
-        Comparar com
-        <select id="empComp">
-          <option value=""${grafico.secundaria === null ? ' selected' : ''}>— nenhum —</option>
+      <div class="emp-modal-comp">
+        <div class="emp-fichas">${fichas}</div>
+        ${opcoesComp ? `<select id="empComp" aria-label="adicionar indicador">
+          <option value="">+ indicador…</option>
           ${opcoesComp}
-        </select>
-      </label>
-      ${legenda}
-      <div class="emp-grafico">${desenhaGrafico(dados, sec)}</div>
-      <p class="emp-modal-nota">${esc(nota)}${sec ? ' Os tiles e a mediana são do indicador clicado; o segundo acompanha os mesmos períodos, no eixo da direita.' : ''}</p>
+        </select>` : ''}
+      </div>
+      <div class="emp-grafico">${desenhaGrafico(dados)}</div>
+      <p class="emp-modal-nota">${esc(nota)}${esc(notaSeries)}</p>
     </div>`;
   modalEl.hidden = false;
 }
@@ -703,18 +823,21 @@ function moveDica(ev) {
     faixa.classList.remove('oculto');
   }
 
-  const valor = (serie) => {
+  const linhas = GEO.series.map((serie) => {
     const v = serie.valores[i];
-    return v === null || v === undefined ? '—' : formata(v, serie.tipo);
-  };
-  const linhaSerie = (serie, classe) => `<div class="emp-dica-linha">
-      <i class="emp-dica-cor ${classe}"></i>
+    return `<div class="emp-dica-linha">
+      <i class="emp-dica-cor" style="background:var(--c${serie.cor})"></i>
       <span class="emp-dica-nome">${esc(serie.nome)}</span>
-      <span class="emp-dica-val">${valor(serie)}</span>
+      <span class="emp-dica-val">${typeof v === 'number' ? formata(v, serie.tipo) : '—'}</span>
     </div>`;
-  dicaEl.innerHTML = `<p class="emp-dica-per">${esc(GEO.rotulos[i])}</p>
-    ${linhaSerie(GEO.serie1, 'serie1')}
-    ${GEO.serie2 ? linhaSerie(GEO.serie2, 'serie2') : ''}`;
+  }).join('');
+  const total = GEO.totais
+    ? `<div class="emp-dica-linha emp-dica-total">
+        <span class="emp-dica-nome">Total</span>
+        <span class="emp-dica-val">${formata(GEO.totais[i], GEO.tipoTotal)}</span>
+      </div>`
+    : '';
+  dicaEl.innerHTML = `<p class="emp-dica-per">${esc(GEO.rotulos[i])}</p>${linhas}${total}`;
 
   dicaEl.hidden = false;
   const larg = dicaEl.offsetWidth;
@@ -750,7 +873,7 @@ function renderAbas() {
     });
     fechaBalao();
     fechaGrafico(); // o índice da coluna aberta era o da outra aba
-    grafico.secundaria = null;
+    grafico.series = [];
     conteudoEl.innerHTML = renderTabela(DADOS);
     atualizaVariacao();
   });

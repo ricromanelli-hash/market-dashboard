@@ -10,7 +10,13 @@
   --text: #1b1f1c;
   --text-muted: #6b7168;
   --symbol-color: #4a6a8a;
-  --serie2: #b8862b; /* segundo indicador do gráfico, contra o verde do primeiro */
+  /* paleta das séries do gráfico; --c0 é o indicador clicado */
+  --c0: #1f5c3f;
+  --c1: #b8862b;
+  --c2: #4a6a8a;
+  --c3: #2f6f70;
+  --c4: #7a4b8a;
+  --c5: #8a4b3c;
 }
 
 * { box-sizing: border-box; }
@@ -1365,48 +1371,58 @@ body.emp-arrastando { user-select: none; }
   font-variant-numeric: tabular-nums;
 }
 
+/* fichas dos indicadores no gráfico: servem de legenda e de controle ao mesmo tempo */
 .emp-modal-comp {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 10px 18px 0;
   font-size: 12.5px;
-  color: var(--text-muted);
 }
 .emp-modal-comp select {
   font: inherit;
-  color: var(--text);
-  padding: 4px 8px;
-  border: 1px solid var(--border);
-  border-radius: 5px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  padding: 5px 8px;
+  border: 1px dashed var(--border);
+  border-radius: 20px;
   background: var(--card-bg);
-  max-width: 240px;
+  max-width: 200px;
 }
 
-.emp-legenda {
+.emp-fichas {
   display: flex;
-  justify-content: center;
-  gap: 24px;
-  padding: 10px 18px 0;
-  font-size: 12.5px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.emp-ficha {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
   font-weight: 600;
+  background: #f4f6f4;
 }
-.emp-leg { display: inline-flex; align-items: center; gap: 7px; }
-.emp-leg-cor {
-  width: 16px;
-  height: 10px;
-  border-radius: 2px;
-  display: inline-block;
+.emp-ficha-cor {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  flex: 0 0 11px;
 }
-.emp-leg-cor.barra { background: var(--green-header); }
-.emp-leg-cor.barra2 { background: var(--serie2); }
-.emp-leg-cor.linha,
-.emp-leg-cor.linha2 {
-  height: 3px;
-  border-radius: 2px;
+.emp-ficha-x {
+  border: none;
+  background: none;
+  padding: 0 0 0 2px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
 }
-.emp-leg-cor.linha { background: var(--green-header); }
-.emp-leg-cor.linha2 { background: var(--serie2); }
+.emp-ficha-x:hover { color: var(--red-down); }
 
 .emp-grafico { padding: 14px 12px 0; }
 .emp-svg { width: 100%; height: auto; }
@@ -1427,20 +1443,23 @@ body.emp-arrastando { user-select: none; }
   font-size: 10.5px;
   text-anchor: end;
 }
-.g-barra { fill: var(--green-header); }
+.g-linha { stroke-width: 2.2; stroke-linejoin: round; }
+/* seletor com elemento vence o `fill` da classe da série, senão a linha sairia preenchida */
+.emp-svg polyline { fill: none; }
+/* levemente translúcida: com eixo duplo a linha do outro indicador cruza as barras */
+.g-barra { fill-opacity: 0.85; }
 .g-barra.neg { fill: var(--red-down); }
-.g-linha { stroke: var(--green-header); stroke-width: 2.2; stroke-linejoin: round; }
-.g-ponto { fill: var(--green-header); }
 
-/* segundo indicador: âmbar contra o verde, e barra semitransparente para a linha do
-   primeiro continuar legível quando as duas se cruzam */
-.g-barra2 { fill: var(--serie2); fill-opacity: 0.75; }
-.g-barra2.neg { fill: var(--red-down); fill-opacity: 0.75; }
-.g-linha2 { stroke: var(--serie2); stroke-width: 2.2; stroke-linejoin: round; }
-.g-ponto2 { fill: var(--serie2); }
-.g-eixo2 { fill: var(--serie2); font-size: 10.5px; text-anchor: start; }
-.g-titulo-eixo { fill: var(--green-header); font-size: 10.5px; font-weight: 700; text-anchor: end; }
-.g-titulo-eixo2 { fill: var(--serie2); font-size: 10.5px; font-weight: 700; text-anchor: start; }
+.g-s0 { fill: var(--c0); stroke: var(--c0); }
+.g-s1 { fill: var(--c1); stroke: var(--c1); }
+.g-s2 { fill: var(--c2); stroke: var(--c2); }
+.g-s3 { fill: var(--c3); stroke: var(--c3); }
+.g-s4 { fill: var(--c4); stroke: var(--c4); }
+.g-s5 { fill: var(--c5); stroke: var(--c5); }
+
+.g-eixo2 { fill: var(--c1); font-size: 10.5px; text-anchor: start; }
+.g-titulo-eixo { fill: var(--c0); font-size: 10.5px; font-weight: 700; text-anchor: end; }
+.g-titulo-eixo2 { fill: var(--c1); font-size: 10.5px; font-weight: 700; text-anchor: start; }
 .g-valor {
   fill: var(--text);
   font-size: 10px;
@@ -1488,9 +1507,13 @@ body.emp-arrastando { user-select: none; }
   border-radius: 2px;
   flex: 0 0 10px;
 }
-.emp-dica-cor.serie1 { background: var(--green-header); }
-.emp-dica-cor.serie2 { background: var(--serie2); }
 .emp-dica-nome { color: var(--text-muted); }
+.emp-dica-total {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+.emp-dica-total .emp-dica-nome { font-weight: 700; color: var(--text); }
 .emp-dica-val {
   margin-left: auto;
   font-weight: 700;
