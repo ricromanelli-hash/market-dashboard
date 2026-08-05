@@ -102,6 +102,11 @@ const COLUNAS_EVA = [
   { chave: 'dlEbitda', rotulo: 'DL/EBITDA', tipo: 'x', grupo: 'divida' },
   { chave: 'percCp', rotulo: 'Cap Próprio %', tipo: 'pct1', grupo: 'divida' },
   { chave: 'percCt', rotulo: 'Cap Terceiro %', tipo: 'pct1', grupo: 'divida' },
+  { chave: 'taxaLivreRisco', rotulo: 'Rf', tipo: 'pct1', grupo: 'divida' },
+  { chave: 'erp', rotulo: 'ERP', tipo: 'pct1', grupo: 'divida' },
+  { chave: 'riscoPais', rotulo: 'Risco País', tipo: 'pct1', grupo: 'divida' },
+  { chave: 'difInflacao', rotulo: 'Dif Inflação', tipo: 'pct1', grupo: 'divida' },
+  { chave: 'custoKe', rotulo: 'Ke', tipo: 'pct1', grupo: 'divida' },
   { chave: 'custoCp', rotulo: 'Custo CP 10a', tipo: 'pct1', grupo: 'divida' },
   { chave: 'custoCt', rotulo: 'Custo CT', tipo: 'pct1', grupo: 'divida' },
   { chave: 'beta', rotulo: 'Beta', tipo: 'dec', grupo: 'divida' },
@@ -919,6 +924,15 @@ const MODELOS = [
   { aba: 'eva', nome: 'Representatividade do Capital', chaves: ['patrimonio', 'divida'], tipo: 'empilhada' },
   { aba: 'eva', nome: 'Capital Próprio × Terceiros', chaves: ['percCp', 'percCt'], tipo: 'empilhada' },
   { aba: 'eva', nome: 'Custo de Capital', chaves: ['custoCp', 'custoCt', 'wacc'], tipo: 'linha' },
+  // as parcelas do CAPM sem multiplicar o ERP pelo beta: o total da pilha é o custo de
+  // capital próprio de mercado, igual para todas as empresas. O Ke da tabela, esse sim,
+  // aplica o beta da empresa e por isso não bate com a soma.
+  {
+    aba: 'eva',
+    nome: 'Custo de Capital Próprio (s/ beta)',
+    chaves: ['taxaLivreRisco', 'erp', 'riscoPais', 'difInflacao'],
+    tipo: 'empilhada',
+  },
   { aba: 'eva', nome: 'Valor de Mercado × Spread', chaves: ['valorMercado', 'spread'], tipo: 'linha' },
   { aba: 'eva', nome: 'EVA', chaves: ['eva'], tipo: 'barra' },
 ].map((m) => ({ anos: 'tudo', ignorar: true, ...m })); // janela e filtro padrão, se o modelo não disser outra coisa

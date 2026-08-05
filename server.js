@@ -1525,6 +1525,14 @@ const CAMPOS_KPI = [
   ['dlEbitda', 'dl_ebitda', razao],
   ['percCp', 'perc_cp', pct],
   ['percCt', 'perc_ct', pct],
+  // parcelas do custo de capital próprio (CAPM). Rf, ERP, risco Brasil e diferencial de
+  // inflação são de mercado — iguais para todas as empresas no mesmo ano; só o beta, e
+  // portanto o `custoke`, muda de empresa para empresa.
+  ['taxaLivreRisco', 'taxalivrederisco', pct],
+  ['erp', 'erp', pct],
+  ['riscoPais', 'rbr', pct],
+  ['difInflacao', 'dif_inflacao', pct],
+  ['custoKe', 'custoke', pct],
   ['custoCp', 'custokemedio', pct],
   ['custoCt', 'custokdaftertax', pct],
   ['beta', 'beta', decimal],
