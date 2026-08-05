@@ -1598,12 +1598,13 @@ function linhaKpi(r) {
   // Se qualquer parcela faltar a soma seria menor do que o custo real, então vira nulo.
   const capm = [r.taxalivrederisco, r.erp, r.rbr, r.dif_inflacao].map(num);
   linha.keCapm = capm.every((v) => v !== null) ? pct(capm.reduce((s, v) => s + v, 0)) : null;
-  // D/E pela dívida bruta sobre o patrimônio. Com PL zerado a divisão estoura, e com PL
-  // negativo o índice inverte de sinal e viraria uma alavancagem "negativa" — nos dois
-  // casos o número enganaria mais do que ajudaria.
-  const pl = num(r.plcontabil);
+  // D/E pela dívida bruta sobre o valor de mercado do equity (não sobre o PL contábil).
+  // Market cap zerado estoura a divisão, então nesse caso a célula fica vazia.
+  const equity = num(r.valordemercado);
   const dividaBruta = num(r.divida_bruta);
-  linha.divEquity = pl !== null && pl > 0 && dividaBruta !== null ? pct(dividaBruta / pl) : null;
+  linha.divEquity = equity !== null && equity > 0 && dividaBruta !== null
+    ? pct(dividaBruta / equity)
+    : null;
   return linha;
 }
 
