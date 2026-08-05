@@ -1171,6 +1171,17 @@ body.tv-mode a.row-stock:hover { background: none; }
   background: #fdf6e3;
   font-weight: 600;
 }
+.emp-fav-btn.modelo {
+  color: var(--green-header);
+  border-color: #cfe0d4;
+  background: #eef4ef;
+  font-weight: 600;
+  cursor: default;
+}
+
+/* favorito pessoal ao lado dos modelos: a estrela no rótulo já separa os dois */
+.emp-fav.pessoal { background: #fdf6e3; border-color: #e6d9b4; }
+.emp-fav.pessoal .emp-fav-abrir { color: #8a6a12; }
 
 /* ---- Seleção do período comparado ---- */
 .emp-controles {

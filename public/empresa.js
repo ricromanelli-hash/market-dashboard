@@ -746,6 +746,7 @@ function renderModal() {
     .join('');
 
   const favorito = ehFavorito();
+  const modelo = ehModelo(); // combinação que já vem no código: não há o que salvar
   const usadas = [grafico.coluna, ...grafico.series];
   // a próxima a entrar já divide eixo se for a terceira, ou se o gráfico for empilhado
   const proximaDivideEixo = grafico.tipo === 'empilhada' || grafico.series.length >= 1;
@@ -796,9 +797,11 @@ function renderModal() {
           <option value="">+ indicador…</option>
           ${opcoesComp}
         </select>` : ''}
-        <button type="button" id="empFav" class="emp-fav-btn${favorito ? ' ativo' : ''}">
-          ${favorito ? '★' : '☆'} ${favorito ? 'Favorito' : 'Salvar'}
-        </button>
+        ${modelo
+    ? '<span class="emp-fav-btn modelo">Modelo da galeria</span>'
+    : `<button type="button" id="empFav" class="emp-fav-btn${favorito ? ' ativo' : ''}">
+          ${favorito ? '★ Salvo' : '☆ Salvar'}
+        </button>`}
       </div>
       <div class="emp-grafico">${desenhaGrafico(dados)}</div>
       <p class="emp-modal-nota">${esc(nota)}${esc(notaSeries)}</p>
@@ -892,11 +895,34 @@ function trocaAba(nova) {
   fechaBalao();
   conteudoEl.innerHTML = renderTabela(DADOS);
   atualizaVariacao();
+  renderGaleria(); // a barra é filtrada pela aba
 }
 
-// ---- Favoritos ----
-// Combinações salvas ficam no navegador e valem para qualquer empresa: guardam a chave
-// da coluna, não o índice, que muda de aba para aba e mudaria se a tabela ganhasse colunas.
+// ---- Galeria de gráficos ----
+// Os modelos vêm no código, então aparecem para qualquer um que abrir a página, em
+// qualquer máquina. Os favoritos pessoais (localStorage) entram depois deles na barra.
+// Tudo aqui guarda a chave da coluna, nunca o índice: índice muda de aba para aba e
+// mudaria de novo se a tabela ganhasse colunas, e o gráfico abriria o indicador errado.
+const MODELOS = [
+  // --- aba de indicadores ---
+  { aba: 'kpi', nome: 'Receita × Lucro', chaves: ['receita', 'lucro'], tipo: 'barra' },
+  { aba: 'kpi', nome: 'Margens', chaves: ['margemEbitda', 'margemLiquida'], tipo: 'linha' },
+  { aba: 'kpi', nome: 'Geração de Caixa', chaves: ['fco', 'capex', 'fcl'], tipo: 'barra' },
+  { aba: 'kpi', nome: 'FCL × FCL Yield', chaves: ['fcl', 'fclYield'], tipo: 'barra' },
+  { aba: 'kpi', nome: 'Proventos × DY', chaves: ['proventos', 'dy'], tipo: 'barra' },
+  { aba: 'kpi', nome: 'Endividamento', chaves: ['divida', 'dlEbitda'], tipo: 'barra' },
+  { aba: 'kpi', nome: 'ROE', chaves: ['roe'], tipo: 'barra' },
+  // --- aba de EVA ---
+  { aba: 'eva', nome: 'EVA · Spread', chaves: ['roic', 'wacc', 'spread'], tipo: 'linha' },
+  { aba: 'eva', nome: 'NOPAT × Capital Investido', chaves: ['nopat', 'capInvestido'], tipo: 'barra' },
+  { aba: 'eva', nome: 'Margem Operacional', chaves: ['margemNopat'], tipo: 'barra' },
+  { aba: 'eva', nome: 'Representatividade do Capital', chaves: ['patrimonio', 'divida'], tipo: 'empilhada' },
+  { aba: 'eva', nome: 'Capital Próprio × Terceiros', chaves: ['percCp', 'percCt'], tipo: 'empilhada' },
+  { aba: 'eva', nome: 'Custo de Capital', chaves: ['custoCp', 'custoCt', 'wacc'], tipo: 'linha' },
+  { aba: 'eva', nome: 'Valor de Mercado × Spread', chaves: ['valorMercado', 'spread'], tipo: 'linha' },
+  { aba: 'eva', nome: 'EVA', chaves: ['eva'], tipo: 'barra' },
+].map((m) => ({ anos: 'tudo', ignorar: true, ...m })); // janela e filtro padrão, se o modelo não disser outra coisa
+
 const FAVS_CHAVE = 'market-dashboard:graficos-favoritos';
 
 function leFavoritos() {
@@ -928,9 +954,10 @@ const configAtual = () => ({
 
 const assinatura = (f) => `${f.aba}|${f.chaves.join(',')}|${f.tipo}`;
 
-// O nome sai dos rótulos atuais, não de um texto salvo: se uma coluna for renomeada, o
-// favorito acompanha em vez de virar um apelido morto.
-function nomeFavorito(f) {
+// Modelo tem nome próprio, escrito no código. Favorito pessoal não guarda nome: sai dos
+// rótulos atuais, para renomear uma coluna não deixar um apelido morto na barra.
+function nomeConfig(f) {
+  if (f.nome) return f.nome;
   const aba = ABAS.find((a) => a.id === f.aba);
   if (!aba) return '';
   const rotulos = f.chaves
@@ -939,9 +966,22 @@ function nomeFavorito(f) {
   return rotulos.length === f.chaves.length ? rotulos.join(' × ') : '';
 }
 
-function ehFavorito() {
-  return FAVORITOS.some((f) => assinatura(f) === assinatura(configAtual()));
+// A barra mostra só o que serve para a aba aberta — um modelo de EVA não abre na tabela
+// de indicadores, porque as colunas não existem lá.
+function galeriaDaAba() {
+  const daAba = (f) => f.aba === ABA.id && f.chaves.every((ch) => COLUNAS().some((c) => c.chave === ch));
+  // favorito que repete um modelo não vira ficha própria: apareceria duas vezes na barra
+  const jaNaGaleria = (cfg) => MODELOS.some((m) => assinatura(m) === assinatura(cfg));
+  return [
+    ...MODELOS.filter(daAba).map((cfg, i) => ({ cfg, id: `m:${i}`, pessoal: false })),
+    ...FAVORITOS
+      .map((cfg, i) => ({ cfg, id: `f:${i}`, pessoal: true }))
+      .filter((x) => daAba(x.cfg) && !jaNaGaleria(x.cfg)),
+  ];
 }
+
+const ehModelo = () => MODELOS.some((m) => assinatura(m) === assinatura(configAtual()));
+const ehFavorito = () => FAVORITOS.some((f) => assinatura(f) === assinatura(configAtual()));
 
 function alternaFavorito() {
   const atual = configAtual();
@@ -950,13 +990,14 @@ function alternaFavorito() {
     ? FAVORITOS.filter((f) => assinatura(f) !== chave)
     : [...FAVORITOS, atual];
   gravaFavoritos();
-  renderFavoritos();
+  renderGaleria();
   renderModal();
 }
 
-function aplicaFavorito(pos) {
-  const f = FAVORITOS[pos];
-  if (!f) return;
+function aplicaConfig(id) {
+  const item = galeriaDaAba().find((x) => x.id === id);
+  if (!item) return;
+  const f = item.cfg;
   const aba = ABAS.find((a) => a.id === f.aba);
   if (aba && aba.id !== ABA.id) trocaAba(aba);
   const indices = f.chaves.map((ch) => COLUNAS().findIndex((c) => c.chave === ch));
@@ -969,32 +1010,34 @@ function aplicaFavorito(pos) {
   renderModal();
 }
 
-function renderFavoritos() {
-  const fichas = FAVORITOS.map((f, i) => {
-    const nome = nomeFavorito(f);
-    if (!nome) return ''; // aba ou coluna que não existe mais
-    const aba = ABAS.find((a) => a.id === f.aba);
-    return `<span class="emp-fav">
-      <button type="button" class="emp-fav-abrir" data-fav="${i}" title="${esc(aba.rotulo)} · ${esc(f.tipo)}">${esc(nome)}</button>
-      <button type="button" class="emp-fav-x" data-favx="${i}" aria-label="tirar ${esc(nome)} dos favoritos">×</button>
+function renderGaleria() {
+  const fichas = galeriaDaAba().map(({ cfg, id, pessoal }) => {
+    const nome = nomeConfig(cfg);
+    if (!nome) return '';
+    const x = pessoal
+      ? `<button type="button" class="emp-fav-x" data-favx="${id.slice(2)}" aria-label="tirar ${esc(nome)}">×</button>`
+      : '';
+    return `<span class="emp-fav${pessoal ? ' pessoal' : ''}">
+      <button type="button" class="emp-fav-abrir" data-abrir="${id}" title="${esc(cfg.tipo)}${pessoal ? ' · salvo por você' : ''}">${pessoal ? '★ ' : ''}${esc(nome)}</button>
+      ${x}
     </span>`;
   }).join('');
-  favsEl.innerHTML = fichas ? `<span class="emp-favs-rot">Favoritos</span>${fichas}` : '';
+  favsEl.innerHTML = fichas ? `<span class="emp-favs-rot">Gráficos</span>${fichas}` : '';
   favsEl.hidden = !fichas;
 }
 
-function ligaFavoritos() {
+function ligaGaleria() {
   favsEl.addEventListener('click', (ev) => {
     const tirar = ev.target.closest('[data-favx]');
     if (tirar) {
       FAVORITOS = FAVORITOS.filter((_, i) => i !== Number(tirar.dataset.favx));
       gravaFavoritos();
-      renderFavoritos();
+      renderGaleria();
       if (!modalEl.hidden) renderModal(); // a estrela do gráfico aberto pode ter mudado
       return;
     }
-    const abrir = ev.target.closest('[data-fav]');
-    if (abrir) aplicaFavorito(Number(abrir.dataset.fav));
+    const abrir = ev.target.closest('[data-abrir]');
+    if (abrir) aplicaConfig(abrir.dataset.abrir);
   });
 }
 
@@ -1075,8 +1118,8 @@ async function carrega() {
     subEl.textContent = `${dados.unidade} · exercícios encerrados e últimos 12 meses (TTM) · fonte: re_kpi`;
     conteudoEl.innerHTML = renderTabela(dados);
     renderAbas();
-    renderFavoritos();
-    ligaFavoritos();
+    renderGaleria();
+    ligaGaleria();
     if (dados.linhas.length > 1) {
       renderControles(dados.linhas);
       atualizaVariacao();
