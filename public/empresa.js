@@ -6,6 +6,7 @@ const TICKER = (params.get('ticker') || '').toUpperCase().replace(/[^A-Z0-9]/g, 
 
 const tituloEl = document.getElementById('empTitulo');
 const subEl = document.getElementById('empSub');
+const controlesEl = document.getElementById('empControles');
 const conteudoEl = document.getElementById('empConteudo');
 
 const fmtMi = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
@@ -47,6 +48,10 @@ const COLUNAS = [
   { chave: 'dy', rotulo: 'DY', tipo: 'pct1', grupo: 'provento' },
 ];
 
+const MS_ANO = 365.25 * 24 * 60 * 60 * 1000;
+
+let DADOS = null; // guardado para recalcular a variação sem refazer o fetch
+
 function formata(valor, tipo) {
   if (tipo === 'texto') return esc(valor);
   if (valor === null || valor === undefined) return '—';
@@ -64,23 +69,124 @@ function periodo(linha) {
   return linha.ttm ? `${mes}/${ano.slice(2)} TTM` : `${mes}/${ano}`;
 }
 
+// ---- Variação entre dois períodos escolhidos ----
+
+// Pelas datas de fechamento, não pela diferença de `ano`: assim o TTM pode ser uma das
+// pontas e o expoente do CAGR sai fracionário (12/2017 → 03/26 dá 8,25 anos).
+function anosEntre(ini, fim) {
+  const t1 = Date.parse(ini.data);
+  const t2 = Date.parse(fim.data);
+  if (!Number.isFinite(t1) || !Number.isFinite(t2)) return null;
+  return (t2 - t1) / MS_ANO;
+}
+
+// Razão só descreve crescimento quando as duas pontas têm o mesmo sinal e nenhuma é zero.
+// Lucro que sai de -13 bi para +110 bi não tem variação percentual com significado, e
+// elevar um número negativo a 1/n devolveria NaN de qualquer jeito.
+const razaoValida = (a, b) => a !== 0 && b !== 0 && Math.sign(a) === Math.sign(b);
+
+const comSinal = (v, sufixo) => `${v >= 0 ? '+' : ''}${fmt1.format(v)}${sufixo}`;
+
+function celulaVariacao(coluna, ini, fim, anos, modo) {
+  const a = ini[coluna.chave];
+  const b = fim[coluna.chave];
+  if (typeof a !== 'number' || typeof b !== 'number') return { texto: '—' };
+
+  // Margem, ROE, DY, payout e DL/EBITDA já são razões: crescer de 2% para 4% não é
+  // "dobrar de tamanho". Nesses vai a diferença absoluta, e CAGR não se aplica.
+  if (coluna.tipo !== 'mi') {
+    if (modo === 'cagr') return { texto: '—', dica: 'CAGR não se aplica a um indicador que já é razão' };
+    const d = b - a;
+    return { texto: comSinal(d, coluna.tipo === 'x' ? 'x' : 'pp'), valor: d };
+  }
+
+  if (!razaoValida(a, b)) {
+    return { texto: 'n/d', dica: 'variação sem sentido: o valor troca de sinal ou parte de zero' };
+  }
+  const razao = b / a;
+  const v = (modo === 'cagr' ? Math.pow(razao, 1 / anos) - 1 : razao - 1) * 100;
+  return { texto: comSinal(v, '%'), valor: v };
+}
+
+function linhaVariacao(rotulo, modo, ini, fim, anos) {
+  const celulas = COLUNAS.map((coluna, i) => {
+    if (i === 0) return `<td class="emp-periodo">${esc(rotulo)}</td>`;
+    const r = celulaVariacao(coluna, ini, fim, anos, modo);
+    const classes = ['emp-num', typeof r.valor === 'number' && r.valor < 0 ? 'neg' : ''].join(' ');
+    const dica = r.dica ? ` title="${esc(r.dica)}"` : '';
+    return `<td class="${classes}"${dica}>${r.texto}</td>`;
+  }).join('');
+  return `<tr class="emp-var emp-var-${modo}">${celulas}</tr>`;
+}
+
+function atualizaVariacao() {
+  const linhas = DADOS.linhas;
+  const iIni = Number(document.getElementById('empDe').value);
+  const iFim = Number(document.getElementById('empAte').value);
+  const rodape = document.getElementById('empRodape');
+  const intervalo = document.getElementById('empIntervalo');
+
+  linhas.forEach((_, i) => {
+    const tr = conteudoEl.querySelector(`tr[data-i="${i}"]`);
+    if (tr) tr.classList.toggle('emp-marcado', i === iIni || i === iFim);
+  });
+
+  const ini = linhas[iIni];
+  const fim = linhas[iFim];
+  const anos = ini && fim ? anosEntre(ini, fim) : null;
+  if (!anos || anos <= 0) {
+    intervalo.textContent = 'o período final precisa ser posterior ao inicial';
+    intervalo.classList.add('emp-intervalo-erro');
+    rodape.innerHTML = '';
+    return;
+  }
+  // "8 anos" quando fecha redondo; "8,3 anos" quando uma das pontas é o TTM
+  const arredondado = Math.round(anos);
+  const txtAnos = Math.abs(anos - arredondado) < 0.05 ? String(arredondado) : fmt1.format(anos);
+  intervalo.textContent = `${periodo(ini)} → ${periodo(fim)} (${txtAnos} ano${txtAnos === '1' ? '' : 's'})`;
+  intervalo.classList.remove('emp-intervalo-erro');
+
+  rodape.innerHTML = linhaVariacao('Var. total', 'total', ini, fim, anos)
+    + linhaVariacao('CAGR a.a.', 'cagr', ini, fim, anos);
+}
+
+function opcoes(linhas, selecionado) {
+  return linhas
+    .map((l, i) => `<option value="${i}"${i === selecionado ? ' selected' : ''}>${esc(periodo(l))}</option>`)
+    .join('');
+}
+
+function renderControles(linhas) {
+  // Fecha no último exercício, não no TTM: o padrão fica em anos redondos, e o TTM
+  // continua à mão na lista para quem quiser trazer a variação até hoje.
+  const ultimoExercicio = linhas.reduce((achado, l, i) => (l.ttm ? achado : i), linhas.length - 1);
+  controlesEl.innerHTML = `
+    <label class="emp-ctrl">De <select id="empDe">${opcoes(linhas, 0)}</select></label>
+    <label class="emp-ctrl">Até <select id="empAte">${opcoes(linhas, ultimoExercicio)}</select></label>
+    <span id="empIntervalo" class="emp-intervalo"></span>`;
+  document.getElementById('empDe').addEventListener('change', atualizaVariacao);
+  document.getElementById('empAte').addEventListener('change', atualizaVariacao);
+  controlesEl.hidden = false;
+}
+
 function renderTabela(dados) {
   const cabecalho = COLUNAS
     .map((c) => `<th class="g-${c.grupo}">${esc(c.rotulo)}</th>`)
     .join('');
-  const corpo = dados.linhas.map((linha) => {
+  const corpo = dados.linhas.map((linha, i) => {
     const celulas = COLUNAS.map((c) => {
       const valor = c.chave === 'periodo' ? periodo(linha) : linha[c.chave];
       const negativo = typeof valor === 'number' && valor < 0;
       const classes = [c.chave === 'periodo' ? 'emp-periodo' : 'emp-num', negativo ? 'neg' : ''].join(' ');
       return `<td class="${classes}">${formata(valor, c.tipo)}</td>`;
     }).join('');
-    return `<tr class="${linha.ttm ? 'emp-ttm' : ''}">${celulas}</tr>`;
+    return `<tr data-i="${i}" class="${linha.ttm ? 'emp-ttm' : ''}">${celulas}</tr>`;
   }).join('');
   return `<div class="emp-tabela-wrap">
     <table class="emp-tabela">
       <thead><tr>${cabecalho}</tr></thead>
       <tbody>${corpo}</tbody>
+      <tfoot id="empRodape"></tfoot>
     </table>
   </div>`;
 }
@@ -112,8 +218,13 @@ async function carrega() {
       );
       return;
     }
+    DADOS = dados;
     subEl.textContent = `${dados.unidade} · exercícios encerrados e últimos 12 meses (TTM) · fonte: re_kpi`;
     conteudoEl.innerHTML = renderTabela(dados);
+    if (dados.linhas.length > 1) {
+      renderControles(dados.linhas);
+      atualizaVariacao();
+    }
   } catch (err) {
     subEl.textContent = '';
     conteudoEl.innerHTML = aviso('Não foi possível carregar os indicadores.', err.message);

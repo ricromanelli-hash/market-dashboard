@@ -1050,10 +1050,13 @@ body.tv-mode a.row-stock:hover { background: none; }
 .emp-tabela th.g-ano { left: 0; z-index: 3; }
 
 /* linha dos últimos 12 meses: é a única que não fecha exercício, então se destaca */
-.emp-ttm td {
+/* seletor longo (e não !important) para vencer o zebrado sem travar o realce das
+   pontas do intervalo, que vem depois e precisa poder repintar a linha do TTM */
+.emp-tabela tbody tr.emp-ttm td,
+.emp-tabela tbody tr.emp-ttm .emp-periodo {
   font-weight: 700;
   border-top: 2px solid var(--green-header);
-  background: #eef4ef !important;
+  background: #eef4ef;
 }
 
 /* faixas de cor por bloco do balanço: resultado, custo, patrimônio, dívida, caixa e proventos */
@@ -1064,6 +1067,57 @@ body.tv-mode a.row-stock:hover { background: none; }
 .g-divida { background: #8a4b3c; }
 .g-caixa { background: #2f6f70; }
 .g-provento { background: #5a4a7a; }
+
+/* ---- Seleção do período comparado ---- */
+.emp-controles {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 10px 20px;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+}
+
+.emp-ctrl {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+}
+
+.emp-ctrl select {
+  font: inherit;
+  color: var(--text);
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--card-bg);
+}
+
+.emp-intervalo {
+  font-weight: 600;
+  color: var(--green-header);
+}
+.emp-intervalo-erro { color: var(--red-down); }
+
+/* ---- Linhas de variação no rodapé da tabela ---- */
+.emp-tabela tfoot td {
+  background: #eef4ef;
+  font-weight: 700;
+  border-bottom: none;
+}
+/* sem isto o zebrado do tbody vence no primeiro rodapé e a faixa fica cortada */
+.emp-tabela tfoot .emp-periodo { background: #eef4ef; }
+.emp-tabela tfoot .emp-var-total td { border-top: 2px solid var(--green-header); }
+.emp-tabela tfoot .emp-var-cagr td { color: var(--green-dark); }
+.emp-tabela tfoot .neg { color: var(--red-down); }
+
+/* pontas do intervalo destacadas no corpo, para casar com o rodapé */
+.emp-tabela tbody tr.emp-marcado td,
+.emp-tabela tbody tr.emp-marcado .emp-periodo { background: #fdf6e3; }
+.emp-tabela tbody tr.emp-marcado .emp-periodo { font-weight: 700; }
 
 .emp-aviso {
   margin: 20px;
