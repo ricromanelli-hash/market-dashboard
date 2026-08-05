@@ -102,6 +102,7 @@ const COLUNAS_EVA = [
   { chave: 'dlEbitda', rotulo: 'DL/EBITDA', tipo: 'x', grupo: 'divida' },
   { chave: 'percCp', rotulo: 'Cap Próprio %', tipo: 'pct1', grupo: 'divida' },
   { chave: 'percCt', rotulo: 'Cap Terceiro %', tipo: 'pct1', grupo: 'divida' },
+  { chave: 'divEquity', rotulo: 'D/E', tipo: 'pct1', grupo: 'divida' },
   { chave: 'taxaLivreRisco', rotulo: 'Rf', tipo: 'pct1', grupo: 'divida' },
   { chave: 'erp', rotulo: 'ERP', tipo: 'pct1', grupo: 'divida' },
   { chave: 'riscoPais', rotulo: 'Risco País', tipo: 'pct1', grupo: 'divida' },
@@ -924,7 +925,8 @@ const MODELOS = [
   { aba: 'eva', nome: 'NOPAT × Capital Investido', chaves: ['nopat', 'capInvestido'], tipo: 'barra' },
   { aba: 'eva', nome: 'Margem Operacional', chaves: ['margemNopat'], tipo: 'barra' },
   { aba: 'eva', nome: 'Representatividade do Capital', chaves: ['patrimonio', 'divida'], tipo: 'empilhada' },
-  { aba: 'eva', nome: 'Capital Próprio × Terceiros', chaves: ['percCp', 'percCt'], tipo: 'empilhada' },
+  { aba: 'eva', nome: 'Estrutura de Capital', chaves: ['percCp', 'percCt'], tipo: 'empilhada' },
+  { aba: 'eva', nome: 'Índice D/E', chaves: ['divEquity'], tipo: 'barra' },
   { aba: 'eva', nome: 'Custo de Capital', chaves: ['custoCp', 'custoCt', 'wacc'], tipo: 'linha' },
   { aba: 'eva', nome: 'WACC', chaves: ['wacc'], tipo: 'barra' },
   // as parcelas do CAPM sem multiplicar o ERP pelo beta: o total da pilha é o custo de
