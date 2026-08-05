@@ -1307,7 +1307,6 @@ body.emp-arrastando { user-select: none; }
 .emp-modal-ind strong { font-size: 16px; }
 
 .emp-modal-anom {
-  margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1315,13 +1314,14 @@ body.emp-arrastando { user-select: none; }
   cursor: pointer;
 }
 
-.emp-modal-tipo {
+/* controle segmentado, usado na janela de anos e no tipo de gráfico */
+.emp-seg {
   display: inline-flex;
   border: 1px solid var(--border);
   border-radius: 6px;
   overflow: hidden;
 }
-.emp-modal-tipo button {
+.emp-seg button {
   border: none;
   background: var(--card-bg);
   font: inherit;
@@ -1330,11 +1330,16 @@ body.emp-arrastando { user-select: none; }
   cursor: pointer;
   color: var(--text-muted);
 }
-.emp-modal-tipo button.ativo {
+.emp-seg button + button { border-left: 1px solid var(--border); }
+.emp-seg button:hover { color: var(--text); }
+.emp-seg button.ativo {
   background: var(--green-header);
   color: #fff;
   font-weight: 600;
 }
+
+/* empurra a janela, o filtro e o tipo para a direita, longe do nome do indicador */
+.emp-modal-anos { margin-left: auto; }
 
 .emp-tiles {
   display: grid;

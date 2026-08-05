@@ -366,11 +366,11 @@ function ligaArrasto() {
       fechaGrafico();
       return;
     }
-    const botao = ev.target.closest('.emp-modal-tipo button');
-    if (botao) {
-      grafico.tipo = botao.dataset.tipo;
-      renderModal();
-    }
+    const botao = ev.target.closest('.emp-seg button');
+    if (!botao) return;
+    if (botao.dataset.tipo) grafico.tipo = botao.dataset.tipo;
+    if (botao.dataset.anos) grafico.anos = botao.dataset.anos === 'tudo' ? 'tudo' : Number(botao.dataset.anos);
+    renderModal();
   });
 
   modalEl.addEventListener('change', (ev) => {
@@ -390,7 +390,17 @@ function ligaArrasto() {
 
 // `ignorar` começa ligado porque um único exercício atípico (P/L num ano de prejuízo,
 // margem sobre base quase zero) estica a escala e achata todo o resto do gráfico.
-const grafico = { coluna: null, tipo: 'barra', ignorar: true };
+const grafico = { coluna: null, tipo: 'barra', ignorar: true, anos: 'tudo' };
+
+const JANELAS = [5, 10, 15];
+
+// A janela conta exercícios encerrados e sempre mantém o TTM: "5 anos" é meia década
+// fechada mais onde a empresa está hoje, que é a leitura que a barra "Atual" pede.
+function janela(linhas) {
+  if (grafico.anos === 'tudo') return linhas;
+  const mantidos = new Set(linhas.filter((l) => !l.ttm).slice(-grafico.anos));
+  return linhas.filter((l) => l.ttm || mantidos.has(l));
+}
 
 const rotuloCurto = (l) => (l.ttm ? 'TTM' : String(l.ano ?? periodo(l)));
 
@@ -419,14 +429,18 @@ function limitesAnomalia(valores) {
 
 function pontosDoIndicador(indice) {
   const coluna = COLUNAS()[indice];
-  const todos = DADOS.linhas
-    .map((l) => ({ rotulo: rotuloCurto(l), valor: l[coluna.chave] }))
-    .filter((p) => typeof p.valor === 'number');
-  const limites = grafico.ignorar ? limitesAnomalia(todos.map((p) => p.valor)) : null;
+  const ponto = (l) => ({ rotulo: rotuloCurto(l), valor: l[coluna.chave] });
+  const numerico = (p) => typeof p.valor === 'number';
+  const serieCheia = DADOS.linhas.map(ponto).filter(numerico);
+  const todos = janela(DADOS.linhas).map(ponto).filter(numerico);
+  // Os limites saem da série inteira, mesmo com a janela apertada: calculados só sobre
+  // 5 anos os quartis ficam tão estreitos que um bom ano vira "anomalia" — o EBITDA de
+  // 2022 da PETR4 era cortado ao escolher 5 anos e voltava ao escolher 10.
+  const limites = grafico.ignorar ? limitesAnomalia(serieCheia.map((p) => p.valor)) : null;
   const mostrados = limites
     ? todos.filter((p) => p.valor >= limites.min && p.valor <= limites.max)
     : todos;
-  return { coluna, todos, mostrados, ocultos: todos.length - mostrados.length };
+  return { coluna, todos, mostrados, ocultos: todos.length - mostrados.length, serieCheia };
 }
 
 // `dir` é folgado porque o rótulo da mediana mora na margem direita: em cima da área do
@@ -517,9 +531,18 @@ function renderModal() {
   const valores = dados.mostrados.map((p) => p.valor);
   const ordenados = [...valores].sort((a, b) => a - b);
   const atual = dados.todos.length ? dados.todos[dados.todos.length - 1].valor : null;
-  const nota = dados.ocultos
-    ? `${dados.ocultos} período${dados.ocultos > 1 ? 's' : ''} fora do intervalo de Tukey (Q1−1,5·IQR a Q3+1,5·IQR) — desmarque acima para ver.`
-    : 'Nenhum período fora do intervalo esperado.';
+  let nota = 'Nenhum período fora do intervalo esperado.';
+  if (dados.ocultos) {
+    nota = `${dados.ocultos} período${dados.ocultos > 1 ? 's' : ''} fora do intervalo de Tukey (Q1−1,5·IQR a Q3+1,5·IQR) — desmarque acima para ver.`;
+  } else if (grafico.ignorar && dados.serieCheia.length < 5) {
+    nota = 'Períodos de menos para avaliar anomalias — o filtro precisa de pelo menos 5.';
+  }
+
+  // exercícios disponíveis: não adianta oferecer 15 anos para quem só tem 8 na base
+  const exercicios = DADOS.linhas.filter((l) => !l.ttm).length;
+  const opcoesJanela = [...JANELAS.filter((n) => n < exercicios), 'tudo']
+    .map((n) => `<button type="button" data-anos="${n}"${String(grafico.anos) === String(n) ? ' class="ativo"' : ''}>${n === 'tudo' ? 'Tudo' : `${n} anos`}</button>`)
+    .join('');
 
   modalEl.innerHTML = `
     <div class="emp-modal-fundo"></div>
@@ -533,10 +556,11 @@ function renderModal() {
           <span class="emp-modal-ind-rot">Indicador</span>
           <strong>${esc(coluna.rotulo)}</strong>
         </span>
+        <div class="emp-seg emp-modal-anos">${opcoesJanela}</div>
         <label class="emp-modal-anom">
           <input type="checkbox" id="empAnom"${grafico.ignorar ? ' checked' : ''}> Ignorar anomalias
         </label>
-        <div class="emp-modal-tipo">
+        <div class="emp-seg emp-modal-tipo">
           <button type="button" data-tipo="linha"${grafico.tipo === 'linha' ? ' class="ativo"' : ''}>Linhas</button>
           <button type="button" data-tipo="barra"${grafico.tipo === 'barra' ? ' class="ativo"' : ''}>Barra</button>
         </div>
