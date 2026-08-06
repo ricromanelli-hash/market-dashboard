@@ -392,9 +392,14 @@ async function fetchQuote(symbol, fromSeries = false) {
   const closePorDia = new Map();
   const diasTrade = [];
   for (let i = 0; i < stamps.length; i++) {
+    // Dia sem close não é pregão utilizável. A partir do IP do Render o Yahoo devolve a
+    // barra de hoje com close nulo e o `regularMarketPrice` parado no fechamento de
+    // ontem; contando esse dia vazio, "ontem" virava o pregão anterior e a variação do
+    // dia saía exatamente 0 — preço e fechamento anterior eram o mesmo número.
+    if (typeof closeArr[i] !== 'number') continue;
     const d = diaUTC(stamps[i]);
     if (!closePorDia.has(d)) diasTrade.push(d);
-    closePorDia.set(d, typeof closeArr[i] === 'number' ? closeArr[i] : (closePorDia.get(d) ?? null));
+    closePorDia.set(d, closeArr[i]);
   }
   const hojeUTC = diaUTC(Date.now() / 1000);
   const ultimoDia = diasTrade[diasTrade.length - 1] || null;
