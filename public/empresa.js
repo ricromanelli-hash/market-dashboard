@@ -232,9 +232,11 @@ const COLUNAS_DRE = [
   // impostos, então sai da seção e vira linha realçada, como Receita Líquida e Lucro Bruto.
   { chave: 'ebt', rotulo: 'EBT', tipo: 'mi', nivel: 0, forte: true, realce: true },
   { chave: 'margemEbt', rotulo: 'Margem EBT', tipo: 'pct1', nivel: 1 },
-  { chave: 'impostos', rotulo: 'Impostos', tipo: 'mi', nivel: 1, grupo: 'Impostos e lucro líquido' },
+  // Sem faixa de seção no fim: Impostos e Lucro Líquido abrem os próprios blocos, no
+  // mesmo padrão de Receita Líquida, Lucro Bruto e EBT.
+  { chave: 'impostos', rotulo: 'Impostos', tipo: 'mi', nivel: 0, forte: true, realce: true },
   { chave: 'impostosPct', rotulo: 'Impostos %', tipo: 'pct1', nivel: 1 },
-  { chave: 'lucro', rotulo: 'Lucro Líquido', tipo: 'mi', nivel: 0, forte: true },
+  { chave: 'lucro', rotulo: 'Lucro Líquido', tipo: 'mi', nivel: 0, forte: true, realce: true },
   { chave: 'margemLiquida', rotulo: 'Margem líquida', tipo: 'pct1', nivel: 1 },
   { chave: 'lucro10y', rotulo: 'Lucro líquido · média 10 anos', tipo: 'mi', nivel: 1 },
   // Não viram linha da tabela — o número já aparece na faixa da seção — mas existem como
