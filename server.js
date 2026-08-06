@@ -1846,13 +1846,17 @@ app.get('/api/data', (req, res) => {
 const DFS_CACHE_MS = 60 * 60 * 1000;
 const dfsCache = new Map();
 
-// "DF Consolidado - Balanço Patrimonial Ativo" -> escopo e nome curto para o seletor
+// "DF Consolidado - Balanço Patrimonial Ativo" -> escopo e nome curto para o seletor.
+// Ativo e passivo entram como uma demonstração só: são as duas metades do mesmo balanço,
+// e como os códigos começam em 1 e em 2, a ordenação por código já põe uma depois da outra.
 function parteGrupo(grupo) {
   const consolidado = grupo.startsWith('DF Consolidado');
-  const nome = grupo.replace(/^DF (Consolidado|Individual) - /, '')
-    .replace('Demonstração do Resultado', 'DRE')
-    .replace('Demonstração do Fluxo de Caixa', 'DFC')
-    .replace('Balanço Patrimonial', 'BP');
+  const bruto = grupo.replace(/^DF (Consolidado|Individual) - /, '');
+  const nome = bruto.startsWith('Balanço Patrimonial')
+    ? 'Balanço Patrimonial'
+    : bruto
+      .replace('Demonstração do Resultado', 'DRE')
+      .replace('Demonstração do Fluxo de Caixa', 'DFC');
   return { escopo: consolidado ? 'Consolidado' : 'Individual', nome };
 }
 
@@ -1883,8 +1887,12 @@ async function carregaDfsCvm(ticker) {
 
   const porGrupo = new Map();
   for (const r of bruto) {
-    if (!porGrupo.has(r.GRUPO_DFP)) porGrupo.set(r.GRUPO_DFP, { contas: new Map(), anos: new Set() });
-    const g = porGrupo.get(r.GRUPO_DFP);
+    // agrupa pelo par escopo+demonstração, não pelo GRUPO_DFP cru: é isso que junta as
+    // duas metades do balanço numa entrada só do seletor
+    const { escopo, nome } = parteGrupo(r.GRUPO_DFP);
+    const chave = `${escopo}|${nome}`;
+    if (!porGrupo.has(chave)) porGrupo.set(chave, { escopo, nome, contas: new Map(), anos: new Set() });
+    const g = porGrupo.get(chave);
     const ano = String(r.DT_FIM_EXERC).slice(0, 4);
     g.anos.add(ano);
     const cd = r.CD_CONTA;
@@ -1897,16 +1905,16 @@ async function carregaDfsCvm(ticker) {
     g.contas.get(cd).valores[ano] = v === null ? null : +(v / escala).toFixed(0);
   }
 
-  const grupos = [...porGrupo.entries()].map(([grupo, g]) => ({
-    grupo,
-    ...parteGrupo(grupo),
+  const grupos = [...porGrupo.values()].map((g) => ({
+    escopo: g.escopo,
+    nome: g.nome,
     anos: [...g.anos].sort((a, b) => Number(b) - Number(a)),
     // "3.01" < "3.02" < "3.10": os códigos vêm com dois dígitos, então a ordem
-    // alfabética já é a ordem da demonstração
+    // alfabética já é a ordem da demonstração — e põe o ativo (1.x) antes do passivo (2.x)
     contas: [...g.contas.values()].sort((a, b) => a.cd.localeCompare(b.cd)),
   }));
   // consolidado antes do individual, e dentro de cada escopo na ordem BP, DRE, DFC
-  const ordem = ['BP Ativo', 'BP Passivo', 'DRE', 'DFC (Método Indireto)', 'DFC (Método Direto)'];
+  const ordem = ['Balanço Patrimonial', 'DRE', 'DFC (Método Indireto)', 'DFC (Método Direto)'];
   grupos.sort((a, b) => (a.escopo === b.escopo
     ? ordem.indexOf(a.nome) - ordem.indexOf(b.nome)
     : a.escopo.localeCompare(b.escopo)));
