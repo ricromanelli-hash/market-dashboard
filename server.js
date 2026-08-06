@@ -1671,6 +1671,18 @@ function linhaKpi(r) {
   // Se qualquer parcela faltar a soma seria menor do que o custo real, então vira nulo.
   const capm = [r.taxalivrederisco, r.erp, r.rbr, r.dif_inflacao].map(num);
   linha.keCapm = capm.every((v) => v !== null) ? pct(capm.reduce((s, v) => s + v, 0)) : null;
+  // Variação de caixa do período: soma dos três fluxos contábeis. Confere com o saldo —
+  // na EGIE3, caixa de 3.959 em 2024 menos 600 em 2025 dá os 3.359 do fim de 2025.
+  const fluxos = [r.fco_contabil, r.fci_contabil, r.fcf_contabil].map(num);
+  linha.varCaixa = fluxos.every((v) => v !== null)
+    ? milhoes(fluxos.reduce((s, v) => s + v, 0))
+    : null;
+  // Conversão do lucro em caixa. Só com lucro positivo: com prejuízo a razão inverte de
+  // sinal e um FCO saudável apareceria como número negativo.
+  const lucroBase = num(r.lucro_liquido);
+  linha.fcoSobreLl = lucroBase !== null && lucroBase > 0
+    ? pct(num(r.fco_contabil) / lucroBase)
+    : null;
   // DuPont de 5 etapas: ROE = (LL/EBT) × (EBT/EBIT) × (EBIT/Receita) × (Receita/Ativo) ×
   // (Ativo/PL). Sai dos valores crus, não dos já arredondados para milhões, senão o
   // produto dos cinco fatores não reconcilia com a coluna de ROE.

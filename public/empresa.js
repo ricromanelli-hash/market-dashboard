@@ -370,12 +370,54 @@ const COLUNAS_BALANCO = [
   { chave: 'roe', rotulo: 'ROE', tipo: 'pct1', oculta: true },
 ];
 
+// DFC no mesmo layout transposto. Os três fluxos contábeis são subtotais realçados sob a
+// faixa da variação de caixa, e só entram como filhas as linhas que de fato compõem cada
+// fluxo. Lucro e D&A ficam num bloco à parte: a base não traz a ponte do lucro até o FCO
+// (lucro + D&A ± capital de giro não fecha com o FCO em nenhum ano testado), então
+// pendurá-los sob o FCO sugeriria uma soma que não existe.
+const COLUNAS_DFC = [
+  {
+    chave: 'fco',
+    rotulo: 'Fluxo operacional (FCO)',
+    tipo: 'mi',
+    nivel: 0,
+    forte: true,
+    realce: true,
+    grupo: 'Fluxo de caixa do período',
+    grupoTotal: { chaves: ['varCaixa'], tipo: 'mi', grafico: 'varCaixa' },
+  },
+  { chave: 'fci', rotulo: 'Fluxo de investimento (FCI)', tipo: 'mi', nivel: 0, forte: true, realce: true },
+  { chave: 'capex', rotulo: 'Capex', tipo: 'mi', nivel: 1 },
+  { chave: 'fcf', rotulo: 'Fluxo de financiamento (FCF)', tipo: 'mi', nivel: 0, forte: true, realce: true },
+  { chave: 'proventos', rotulo: 'Dividendos pagos', tipo: 'mi', nivel: 1 },
+  { chave: 'caixaEquiv', rotulo: 'Caixa no fim do período', tipo: 'mi', nivel: 0, forte: true, realce: true },
+
+  {
+    chave: 'fclYield',
+    rotulo: 'FCL Yield',
+    tipo: 'pct1',
+    nivel: 1,
+    grupo: 'Fluxo de caixa livre',
+    grupoTotal: { chaves: ['fcl'], tipo: 'mi', grafico: 'fcl' },
+  },
+
+  { chave: 'lucro', rotulo: 'Lucro Líquido', tipo: 'mi', nivel: 1, grupo: 'Conversão do lucro em caixa' },
+  { chave: 'da', rotulo: 'Depreciação / Amortização', tipo: 'mi', nivel: 1 },
+  { chave: 'fcoSobreLl', rotulo: 'FCO / Lucro Líquido', tipo: 'pct1', nivel: 1 },
+  { chave: 'capexSobreLl', rotulo: 'Capex / Lucro Líquido', tipo: 'pct1', nivel: 1 },
+
+  // só para o gráfico das faixas
+  { chave: 'varCaixa', rotulo: 'Variação de caixa', tipo: 'mi', oculta: true },
+  { chave: 'fcl', rotulo: 'Fluxo de caixa livre (FCL)', tipo: 'mi', oculta: true },
+];
+
 const ABAS = [
   { id: 'kpi', rotulo: 'Indicadores', colunas: COLUNAS_KPI },
   { id: 'eva', rotulo: 'EVA', colunas: COLUNAS_EVA },
   { id: 'fund', rotulo: 'Fundamentalistas', colunas: COLUNAS_FUND, layout: 'transposta' },
   { id: 'dre', rotulo: 'DRE Resumida', colunas: COLUNAS_DRE, layout: 'transposta' },
   { id: 'bal', rotulo: 'Balanço Resumido', colunas: COLUNAS_BALANCO, layout: 'transposta' },
+  { id: 'dfc', rotulo: 'DFC Resumido', colunas: COLUNAS_DFC, layout: 'transposta' },
 ];
 
 const MS_ANO = 365.25 * 24 * 60 * 60 * 1000;
