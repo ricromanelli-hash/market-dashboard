@@ -1683,7 +1683,10 @@ function linhaKpi(r) {
   const daWf = milhoes(r.deprecamortiz);
   linha.wfDeprec = daWf === null ? null : Math.abs(daWf); // entra somando
   linha.wfFclBruto = soma(linha.wfNoplat, linha.wfDeprec);
-  linha.wfFcff = soma(linha.wfFclBruto, milhoes(r.varcgol), milhoes(r.varanc));
+  // Capex, não a variação do ativo não circulante: como a depreciação é somada de volta
+  // acima, subtrair o `varanc` — que já vem líquido dela — contaria a depreciação duas
+  // vezes. Com capex bruto a cascata vira o FCFF de livro-texto.
+  linha.wfFcff = soma(linha.wfFclBruto, milhoes(r.varcgol), milhoes(r.capex));
   linha.wfDividendos = milhoes(r.dividendos_pagos) === null ? null : -milhoes(r.dividendos_pagos);
   // FCFF já vem pronto da base: `fcf` (o econômico, não o `fcf_contabil`) é NOPAT + invae,
   // conferido em EGIE3 e PETR4 em 2024 e 2025 — que é a definição de fluxo livre para a

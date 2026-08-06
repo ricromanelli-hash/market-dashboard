@@ -423,7 +423,7 @@ const COLUNAS_DFC = [
   { chave: 'wfDeprec', rotulo: '(+) Depreciação', tipo: 'mi', nivel: 1 },
   { chave: 'wfFclBruto', rotulo: 'Fluxo de caixa livre bruto', tipo: 'mi', nivel: 0, forte: true },
   { chave: 'capGiro', rotulo: '(+/−) Capital de giro', tipo: 'mi', nivel: 1 },
-  { chave: 'anc', rotulo: '(−) Investimentos', tipo: 'mi', nivel: 1 },
+  { chave: 'capex', rotulo: '(−) Investimentos', tipo: 'mi', nivel: 1 },
   { chave: 'wfFcff', rotulo: 'FCFF', tipo: 'mi', nivel: 0, forte: true, realce: true },
   { chave: 'resFin', rotulo: 'Resultado financeiro', tipo: 'mi', nivel: 1 },
   { chave: 'deltaDivida', rotulo: 'Dívida (+/−)', tipo: 'mi', nivel: 1 },
