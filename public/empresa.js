@@ -680,6 +680,16 @@ function ligaArrasto() {
   // Abre o histórico: pelo cabeçalho da coluna nas abas normais, pela linha na
   // fundamentalista, onde o indicador é a linha e não a coluna.
   conteudoEl.addEventListener('click', (ev) => {
+    // o botão de abrir/fechar vem antes: ele está dentro da linha que abre o gráfico
+    const expandir = ev.target.closest('[data-exp]');
+    if (expandir) {
+      const cd = expandir.dataset.exp;
+      if (ABA.abertos.has(cd)) ABA.abertos.delete(cd);
+      else ABA.abertos.add(cd);
+      montaColunasCvm(ABA);
+      conteudoEl.innerHTML = renderTabela(DADOS);
+      return undefined;
+    }
     const linha = ev.target.closest('tr[data-ind]');
     if (linha) return abreGrafico(Number(linha.dataset.ind));
     // só o cabeçalho: na tabela transposta o rótulo da linha também é um <th>
@@ -1238,25 +1248,50 @@ function renderAbas() {
 // valores nas linhas que já existem — assim a tabela transposta e o gráfico funcionam sem
 // saber que esta aba é diferente. A chave leva o índice do grupo porque o mesmo código de
 // conta ("1.01") existe em demonstrações diferentes com significados distintos.
+// Quatro níveis abertos ("1", "1.01", "1.01.02", "1.01.02.01"); daí para baixo, sob
+// demanda. `abertos` guarda os códigos cujos filhos estão à mostra — começa com tudo até
+// dois pontos, o que deixa exatamente esses quatro níveis visíveis.
+const NIVEIS_ABERTOS = 2;
+const paiDe = (cd) => (cd.includes('.') ? cd.slice(0, cd.lastIndexOf('.')) : null);
+
+function montaColunasCvm(aba) {
+  const g = aba.dados.grupos[aba.grupoAtivo];
+  const chaveDe = (cd) => `cvm${aba.grupoAtivo}_${cd.replace(/\./g, '_')}`;
+  const temFilho = new Set(g.contas.map((c) => paiDe(c.cd)).filter(Boolean));
+  const visivel = new Map();
+  aba.colunas = g.contas.map((c) => {
+    const pai = paiDe(c.cd);
+    const aparece = pai === null ? true : Boolean(visivel.get(pai)) && aba.abertos.has(pai);
+    visivel.set(c.cd, aparece);
+    const abre = temFilho.has(c.cd)
+      ? `<button type="button" class="emp-exp" data-exp="${esc(c.cd)}" aria-label="abrir ou fechar ${esc(c.cd)}">${aba.abertos.has(c.cd) ? '▾' : '▸'}</button>`
+      : '<span class="emp-exp-vazio"></span>';
+    return {
+      chave: chaveDe(c.cd),
+      rotulo: `${c.cd} · ${c.ds}`,
+      prefixoHtml: abre,
+      tipo: 'mi',
+      nivel: Math.min(c.nivel, 4),
+      forte: c.nivel <= 1,
+      oculta: !aparece,
+    };
+  });
+}
+
 function aplicaGrupoCvm(aba, indice) {
   const g = aba.dados.grupos[indice];
   if (!g) return;
   aba.grupoAtivo = indice;
-  const chaveDe = (cd) => `cvm${indice}_${cd.replace(/\./g, '_')}`;
-  aba.colunas = g.contas.map((c) => ({
-    chave: chaveDe(c.cd),
-    rotulo: `${c.cd} · ${c.ds}`,
-    tipo: 'mi',
-    nivel: Math.min(c.nivel - 1, 2), // 3.01 na margem, 3.04.06.01 recuado duas vezes
-    forte: c.nivel === 1,
-  }));
+  aba.abertos = new Set(g.contas.map((c) => c.cd).filter((cd) => (cd.match(/\./g) || []).length <= NIVEIS_ABERTOS));
   // casa pelo ano; a linha do TTM é trimestral e não tem correspondente anual na CVM
+  const chaveDe = (cd) => `cvm${indice}_${cd.replace(/\./g, '_')}`;
   DADOS.linhas.forEach((linha) => {
     g.contas.forEach((c) => {
       const v = c.valores[String(linha.ano)];
       linha[chaveDe(c.cd)] = typeof v === 'number' ? v : null;
     });
   });
+  montaColunasCvm(aba);
 }
 
 async function carregaAbaDinamica(aba) {
@@ -1544,7 +1579,7 @@ function renderTabelaTransposta(dados) {
     const classes = ['emp-ind', grafica ? 'emp-th-hist' : '', `emp-n${c.nivel || 0}`, c.forte ? 'forte' : ''].join(' ');
     const daLinha = [c.forte ? 'emp-linha-forte' : '', c.realce ? 'emp-linha-realce' : ''].filter(Boolean);
     return `${titulo}<tr data-ind="${i}"${daLinha.length ? ` class="${daLinha.join(' ')}"` : ''}>
-      <th scope="row" class="${classes}"${grafica ? ` title="ver histórico de ${esc(c.rotulo)}"` : ''}>${esc(c.rotulo)}</th>
+      <th scope="row" class="${classes}"${grafica ? ` title="ver histórico de ${esc(c.rotulo)}"` : ''}>${c.prefixoHtml || ''}${esc(c.rotulo)}</th>
       ${celulas}
     </tr>`;
   }).join('');
