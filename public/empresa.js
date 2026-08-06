@@ -178,13 +178,14 @@ const COLUNAS_FUND = [
 // `grupo` só aparece na primeira linha de cada bloco — a faixa é desenhada quando o
 // valor muda, e as linhas seguintes seguem no bloco aberto até a próxima declaração.
 const COLUNAS_DRE = [
-  { chave: 'receita', rotulo: 'Receita Líquida', tipo: 'mi', nivel: 0, forte: true, grupo: 'Receita e custos' },
+  // Sem faixa de seção no topo: a própria Receita Líquida abre a cascata, realçada.
+  { chave: 'receita', rotulo: 'Receita Líquida', tipo: 'mi', nivel: 0, forte: true, realce: true },
   { chave: 'cpv', rotulo: 'Custo produto/serviço vendido (−)', tipo: 'mi', nivel: 1 },
   // sob o próprio CPV, como DVGA / Lucro Bruto fica sob a DVGA. O card do Apolo chama
   // de "CPV/Lucro Bruto", mas wb_custo_cpv_perc bate exatamente com CPV/receita — é o
   // complemento da margem bruta, não uma razão sobre o lucro bruto.
   { chave: 'cpvSobreLb', rotulo: 'CPV / Receita', tipo: 'pct1', nivel: 1 },
-  { chave: 'lucroBruto', rotulo: 'Lucro Bruto', tipo: 'mi', nivel: 0, forte: true },
+  { chave: 'lucroBruto', rotulo: 'Lucro Bruto', tipo: 'mi', nivel: 0, forte: true, realce: true },
   { chave: 'margemBruta', rotulo: 'Margem bruta', tipo: 'pct1', nivel: 1 },
   { chave: 'margemBruta10y', rotulo: 'Margem bruta · média 10 anos', tipo: 'pct1', nivel: 1 },
   {
@@ -202,25 +203,31 @@ const COLUNAS_DRE = [
   { chave: 'eqPatr', rotulo: 'Equivalência Patrimonial', tipo: 'mi', nivel: 1 },
   { chave: 'outrasRd', rotulo: 'Outras Despesas / Receitas', tipo: 'mi', nivel: 1 },
   {
-    chave: 'ebitda',
-    rotulo: 'EBITDA',
-    tipo: 'mi',
-    nivel: 0,
-    forte: true,
+    // A margem abre o bloco porque a faixa acima já traz o EBIT: as duas juntas dizem
+    // quanto sobrou e quanto isso representa da receita, sem repetir o valor numa linha.
+    chave: 'margemEbit',
+    rotulo: 'Margem EBIT',
+    tipo: 'pct1',
+    nivel: 1,
     grupo: 'Resultado operacional/EBIT',
-    // uma parcela só: a faixa carrega o próprio EBIT, que é onde o bloco desemboca
     grupoTotal: { chaves: ['ebit'], tipo: 'mi', grafico: 'ebit' },
   },
+  { chave: 'ebitda', rotulo: 'EBITDA', tipo: 'mi', nivel: 0, forte: true },
   { chave: 'margemEbitda', rotulo: 'Margem EBITDA', tipo: 'pct1', nivel: 1 },
   { chave: 'da', rotulo: 'Depreciação / Amortização', tipo: 'mi', nivel: 1 },
-  { chave: 'ebit', rotulo: 'EBIT', tipo: 'mi', nivel: 0, forte: true },
-  { chave: 'margemEbit', rotulo: 'Margem EBIT', tipo: 'pct1', nivel: 1 },
-  { chave: 'resFin', rotulo: 'Resultado Financeiro', tipo: 'mi', nivel: 1, grupo: 'Resultado financeiro' },
-  { chave: 'varCambial', rotulo: 'Variação Cambial', tipo: 'mi', nivel: 2 },
-  { chave: 'despJuros', rotulo: 'Despesas com juros', tipo: 'mi', nivel: 2 },
-  { chave: 'despJurosPct', rotulo: 'Despesas com juros %', tipo: 'pct1', nivel: 2 },
-  // wb_perc_despesas_juros divide pelo ebit_ajustado, não pelo EBIT da linha acima
-  { chave: 'jurosSobreEbit', rotulo: 'Juros / EBIT ajustado', tipo: 'pct1', nivel: 2 },
+  {
+    // idem: o valor do resultado financeiro está na faixa, e as parcelas vêm abaixo
+    chave: 'varCambial',
+    rotulo: 'Variação Cambial',
+    tipo: 'mi',
+    nivel: 1,
+    grupo: 'Resultado financeiro',
+    grupoTotal: { chaves: ['resFin'], tipo: 'mi', grafico: 'resFin' },
+  },
+  { chave: 'despJuros', rotulo: 'Despesas com juros', tipo: 'mi', nivel: 1 },
+  { chave: 'despJurosPct', rotulo: 'Despesas com juros %', tipo: 'pct1', nivel: 1 },
+  // wb_perc_despesas_juros divide pelo ebit_ajustado, não pelo EBIT da faixa acima
+  { chave: 'jurosSobreEbit', rotulo: 'Juros / EBIT ajustado', tipo: 'pct1', nivel: 1 },
   { chave: 'ebt', rotulo: 'EBT', tipo: 'mi', nivel: 0, forte: true, grupo: 'Impostos e lucro líquido' },
   { chave: 'margemEbt', rotulo: 'Margem EBT', tipo: 'pct1', nivel: 1 },
   { chave: 'impostos', rotulo: 'Impostos', tipo: 'mi', nivel: 1 },
@@ -1241,7 +1248,8 @@ function renderTabelaTransposta(dados) {
       return `<td class="emp-num${negativo ? ' neg' : ''}">${formata(valor, c.tipo)}</td>`;
     }).join('');
     const classes = ['emp-ind', 'emp-th-hist', `emp-n${c.nivel || 0}`, c.forte ? 'forte' : ''].join(' ');
-    return `${titulo}<tr data-ind="${i}"${c.forte ? ' class="emp-linha-forte"' : ''}>
+    const daLinha = [c.forte ? 'emp-linha-forte' : '', c.realce ? 'emp-linha-realce' : ''].filter(Boolean);
+    return `${titulo}<tr data-ind="${i}"${daLinha.length ? ` class="${daLinha.join(' ')}"` : ''}>
       <th scope="row" class="${classes}" title="ver histórico de ${esc(c.rotulo)}">${esc(c.rotulo)}</th>
       ${celulas}
     </tr>`;
