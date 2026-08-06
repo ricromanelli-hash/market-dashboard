@@ -1688,6 +1688,14 @@ body.emp-arrastando { user-select: none; }
 }
 .emp-tabela-fund tbody tr.emp-grupo td.emp-num.neg { color: var(--red-down); }
 
+/* veredito e afins: texto curto, não número — centralizado e com ajuda no hover */
+.emp-tabela-fund td.emp-calculada {
+  text-align: center;
+  font-weight: 700;
+  color: var(--green-header);
+  cursor: help;
+}
+
 /* linha de dado realçada como faixa: Receita Líquida e Lucro Bruto abrem seus blocos */
 .emp-tabela-fund tbody tr.emp-linha-realce td,
 .emp-tabela-fund tbody tr.emp-linha-realce th.emp-ind { background: #d7e3d9; }

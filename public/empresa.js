@@ -247,6 +247,51 @@ const COLUNAS_DRE = [
   { chave: 'resFin', rotulo: 'Resultado Financeiro', tipo: 'mi', oculta: true },
 ];
 
+// Os cinco fatores do DuPont agrupados em três blocos, que é como se lê a origem do
+// retorno: quanto o ativo rende operando, quanto disso sobra depois de juros e impostos,
+// e quantas vezes o patrimônio foi multiplicado. O produto dos três continua sendo o ROE.
+const BLOCOS_DUPONT = [
+  { nome: 'operação', curto: 'Oper', descricao: 'margem × giro, ou seja, o EBIT sobre o ativo' },
+  { nome: 'juros e impostos', curto: 'Fisc', descricao: 'quanto do EBIT sobra como lucro líquido' },
+  { nome: 'alavancagem', curto: 'Alav', descricao: 'ativo sobre patrimônio líquido' },
+];
+
+function blocosDuPont(l) {
+  const campos = [l.dpMargem, l.dpGiro, l.dpCarga, l.dpJuros, l.dpAlavanca];
+  if (campos.some((v) => typeof v !== 'number')) return null;
+  const blocos = [(l.dpMargem / 100) * l.dpGiro, l.dpCarga * l.dpJuros, l.dpAlavanca];
+  // logaritmo só existe para positivo, e um bloco negativo (prejuízo, EBIT negativo)
+  // não descreve "de onde veio" retorno nenhum
+  return blocos.every((v) => v > 0) ? blocos : null;
+}
+
+// De onde veio o ROE do período. Como ROE é o produto dos três blocos, o logaritmo
+// transforma o produto em soma — então dá para dizer qual bloco mais afastou o ano da
+// mediana da própria empresa, sem arbitrar peso nenhum.
+function veredito(linha, linhas) {
+  const atual = blocosDuPont(linha);
+  if (!atual) return { texto: '—', dica: 'algum fator do DuPont falta ou é negativo neste período' };
+  const medianas = [0, 1, 2].map((i) => {
+    const serie = linhas.map(blocosDuPont).filter(Boolean).map((b) => b[i]).sort((a, b) => a - b);
+    return quantil(serie, 0.5);
+  });
+  if (medianas.some((v) => !(v > 0))) return { texto: '—', dica: 'série curta demais para comparar' };
+
+  const desvios = atual.map((v, i) => Math.log(v / medianas[i]));
+  const k = desvios.reduce((maior, v, i) => (Math.abs(v) > Math.abs(desvios[maior]) ? i : maior), 0);
+  const bloco = BLOCOS_DUPONT[k];
+  if (Math.abs(desvios[k]) < 0.05) {
+    return { texto: 'em linha', dica: 'nenhum bloco se afasta da mediana da empresa neste período' };
+  }
+  const acima = desvios[k] > 0;
+  const quanto = `${(Math.exp(Math.abs(desvios[k])) * 100 - 100).toFixed(0)}%`;
+  return {
+    texto: `${bloco.curto} ${acima ? '↑' : '↓'}`,
+    dica: `ROE puxado ${acima ? 'para cima' : 'para baixo'} por ${bloco.nome} (${bloco.descricao}), `
+      + `${quanto} ${acima ? 'acima' : 'abaixo'} da mediana da própria empresa`,
+  };
+}
+
 // Balanço no mesmo layout transposto da DRE: os totais de cada lado ficam na faixa da
 // seção e os subtotais viram linha realçada, abrindo os próprios blocos.
 const COLUNAS_BALANCO = [
@@ -310,6 +355,14 @@ const COLUNAS_BALANCO = [
   { chave: 'dpMargem', rotulo: 'Margem operacional · EBIT / Receita', tipo: 'pct1', nivel: 1 },
   { chave: 'dpGiro', rotulo: 'Giro do ativo · Receita / Ativo', tipo: 'dec', nivel: 1 },
   { chave: 'dpAlavanca', rotulo: 'Alavancagem · Ativo / PL', tipo: 'dec', nivel: 1 },
+  {
+    chave: 'veredito',
+    rotulo: 'Veredito · o que puxou o ROE',
+    tipo: 'texto',
+    nivel: 1,
+    forte: true,
+    calcula: veredito, // precisa da série inteira: compara o ano com a mediana da empresa
+  },
 
   // só para o gráfico das faixas: o valor já aparece nelas
   { chave: 'totalAtivo', rotulo: 'Total do Ativo', tipo: 'mi', oculta: true },
@@ -1321,14 +1374,22 @@ function renderTabelaTransposta(dados) {
     // coluna oculta existe só para o gráfico da faixa: não vira linha da tabela
     if (c.oculta) return titulo;
     const celulas = periodos.map((l) => {
+      // coluna calculada recebe a série inteira: existe para comparar o período com ela
+      if (c.calcula) {
+        const saida = c.calcula(l, dados.linhas);
+        const dica = saida.dica ? ` title="${esc(saida.dica)}"` : '';
+        return `<td class="emp-num emp-calculada"${dica}>${esc(saida.texto)}</td>`;
+      }
       const valor = l[c.chave];
       const negativo = typeof valor === 'number' && valor < 0;
       return `<td class="emp-num${negativo ? ' neg' : ''}">${formata(valor, c.tipo)}</td>`;
     }).join('');
-    const classes = ['emp-ind', 'emp-th-hist', `emp-n${c.nivel || 0}`, c.forte ? 'forte' : ''].join(' ');
+    // coluna de texto não abre gráfico: não vira link nem ganha a dica de histórico
+    const grafica = c.tipo !== 'texto';
+    const classes = ['emp-ind', grafica ? 'emp-th-hist' : '', `emp-n${c.nivel || 0}`, c.forte ? 'forte' : ''].join(' ');
     const daLinha = [c.forte ? 'emp-linha-forte' : '', c.realce ? 'emp-linha-realce' : ''].filter(Boolean);
     return `${titulo}<tr data-ind="${i}"${daLinha.length ? ` class="${daLinha.join(' ')}"` : ''}>
-      <th scope="row" class="${classes}" title="ver histórico de ${esc(c.rotulo)}">${esc(c.rotulo)}</th>
+      <th scope="row" class="${classes}"${grafica ? ` title="ver histórico de ${esc(c.rotulo)}"` : ''}>${esc(c.rotulo)}</th>
       ${celulas}
     </tr>`;
   }).join('');
