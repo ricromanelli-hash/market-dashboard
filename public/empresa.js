@@ -439,7 +439,7 @@ const COLUNAS_DFC = [
 ];
 
 const ABAS = [
-  { id: 'kpi', rotulo: 'Indicadores', colunas: COLUNAS_KPI },
+  { id: 'kpi', rotulo: 'Visão DFs Contábil', colunas: COLUNAS_KPI },
   { id: 'eva', rotulo: 'EVA', colunas: COLUNAS_EVA },
   { id: 'fund', rotulo: 'Fundamentalistas', colunas: COLUNAS_FUND, layout: 'transposta' },
   { id: 'dre', rotulo: 'DRE Resumida', colunas: COLUNAS_DRE, layout: 'transposta' },
