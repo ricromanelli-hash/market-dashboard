@@ -175,8 +175,10 @@ const COLUNAS_FUND = [
 // DRE na ordem da demonstração, com `nivel` para o recuo e `forte` nos subtotais. As
 // margens de cada subtotal viram linha própria: no card de um período só elas cabem
 // entre parênteses no rótulo, mas aqui cada ano tem a sua.
+// `grupo` só aparece na primeira linha de cada bloco — a faixa é desenhada quando o
+// valor muda, e as linhas seguintes seguem no bloco aberto até a próxima declaração.
 const COLUNAS_DRE = [
-  { chave: 'receita', rotulo: 'Receita Líquida', tipo: 'mi', nivel: 0, forte: true },
+  { chave: 'receita', rotulo: 'Receita Líquida', tipo: 'mi', nivel: 0, forte: true, grupo: 'Receita e custos' },
   { chave: 'cpv', rotulo: 'Custo produto/serviço vendido (−)', tipo: 'mi', nivel: 1 },
   // sob o próprio CPV, como DVGA / Lucro Bruto fica sob a DVGA. O card do Apolo chama
   // de "CPV/Lucro Bruto", mas wb_custo_cpv_perc bate exatamente com CPV/receita — é o
@@ -186,21 +188,21 @@ const COLUNAS_DRE = [
   { chave: 'margemBruta', rotulo: 'Margem bruta', tipo: 'pct1', nivel: 1 },
   { chave: 'margemBruta10y', rotulo: 'Margem bruta · média 10 anos', tipo: 'pct1', nivel: 1 },
   { chave: 'dvga', rotulo: 'D. Vendas/Gerais/Administrativas', tipo: 'mi', nivel: 1, grupo: 'Despesas operacionais' },
-  { chave: 'dvgaSobreLb', rotulo: 'DVGA / Lucro Bruto', tipo: 'pct1', nivel: 1, grupo: 'Despesas operacionais' },
-  { chave: 'eqPatr', rotulo: 'Equivalência Patrimonial', tipo: 'mi', nivel: 1, grupo: 'Despesas operacionais' },
-  { chave: 'outrasRd', rotulo: 'Outras Despesas / Receitas', tipo: 'mi', nivel: 1, grupo: 'Despesas operacionais' },
-  { chave: 'ebitda', rotulo: 'EBITDA', tipo: 'mi', nivel: 0, forte: true },
+  { chave: 'dvgaSobreLb', rotulo: 'DVGA / Lucro Bruto', tipo: 'pct1', nivel: 1 },
+  { chave: 'eqPatr', rotulo: 'Equivalência Patrimonial', tipo: 'mi', nivel: 1 },
+  { chave: 'outrasRd', rotulo: 'Outras Despesas / Receitas', tipo: 'mi', nivel: 1 },
+  { chave: 'ebitda', rotulo: 'EBITDA', tipo: 'mi', nivel: 0, forte: true, grupo: 'Resultado operacional' },
   { chave: 'margemEbitda', rotulo: 'Margem EBITDA', tipo: 'pct1', nivel: 1 },
   { chave: 'da', rotulo: 'Depreciação / Amortização', tipo: 'mi', nivel: 1 },
   { chave: 'ebit', rotulo: 'EBIT', tipo: 'mi', nivel: 0, forte: true },
   { chave: 'margemEbit', rotulo: 'Margem EBIT', tipo: 'pct1', nivel: 1 },
-  { chave: 'resFin', rotulo: 'Resultado Financeiro', tipo: 'mi', nivel: 1 },
+  { chave: 'resFin', rotulo: 'Resultado Financeiro', tipo: 'mi', nivel: 1, grupo: 'Resultado financeiro' },
   { chave: 'varCambial', rotulo: 'Variação Cambial', tipo: 'mi', nivel: 2 },
   { chave: 'despJuros', rotulo: 'Despesas com juros', tipo: 'mi', nivel: 2 },
   { chave: 'despJurosPct', rotulo: 'Despesas com juros %', tipo: 'pct1', nivel: 2 },
   // wb_perc_despesas_juros divide pelo ebit_ajustado, não pelo EBIT da linha acima
   { chave: 'jurosSobreEbit', rotulo: 'Juros / EBIT ajustado', tipo: 'pct1', nivel: 2 },
-  { chave: 'ebt', rotulo: 'EBT', tipo: 'mi', nivel: 0, forte: true },
+  { chave: 'ebt', rotulo: 'EBT', tipo: 'mi', nivel: 0, forte: true, grupo: 'Impostos e lucro líquido' },
   { chave: 'margemEbt', rotulo: 'Margem EBT', tipo: 'pct1', nivel: 1 },
   { chave: 'impostos', rotulo: 'Impostos', tipo: 'mi', nivel: 1 },
   { chave: 'impostosPct', rotulo: 'Impostos %', tipo: 'pct1', nivel: 1 },
