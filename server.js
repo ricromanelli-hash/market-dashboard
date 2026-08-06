@@ -270,6 +270,7 @@ const cache = {
   updatedAt: null,
   quotesUpdatedAt: null,
   slowUpdatedAt: null,
+  errosParciais: null, // fonte que respondeu só em parte (hoje, o histórico de 12 meses)
   groups: {},
   brasilRates: {
     ipca: null,
@@ -550,6 +551,7 @@ async function refreshHistory() {
     }
   }
   let falhas = 0;
+  const motivos = new Map(); // motivo -> quantas vezes
   const seriesB3 = [];
   await mapWithConcurrency(symbols, 5, async (symbol) => {
     try {
@@ -557,11 +559,23 @@ async function refreshHistory() {
       historySpark.set(symbol, spark);
       historyBase.set(symbol, base);
       if (symbol.endsWith('.SA')) seriesB3.push(closes); // termômetro usa só a B3
-    } catch {
+    } catch (err) {
       falhas += 1; // mantém o histórico anterior, se houver
+      // sem o símbolo: o que interessa é o padrão (ex.: 54 respostas 429 seguidas)
+      const motivo = err.message.replace(/^Yahoo hist \S+: /, '');
+      motivos.set(motivo, (motivos.get(motivo) || 0) + 1);
     }
   });
-  if (falhas === symbols.length) throw new Error('Histórico 12m: todas as ações falharam');
+  // Falha parcial também vai para cache.errors. Antes, com 54 de 66 símbolos falhando o
+  // painel só ficava sem sparkline e sem 12 meses, sem nada dizendo por quê — e o Yahoo
+  // derruba a rajada de 66 pedidos com frequência, então esse é o caso comum, não o raro.
+  if (falhas) {
+    const resumo = [...motivos.entries()].map(([m, n]) => `${n}× ${m}`).join(', ');
+    if (falhas === symbols.length) throw new Error(`Histórico 12m: todas as ${falhas} ações falharam (${resumo})`);
+    cache.errosParciais = `Histórico 12m: ${falhas} de ${symbols.length} ações sem série (${resumo})`;
+  } else {
+    cache.errosParciais = null;
+  }
 
   // termômetro da B3: precisa também da série do Ibovespa
   let ibov = null;
@@ -1049,7 +1063,13 @@ const parseBrDate = (s) => {
 };
 
 async function refreshTesouroIpca2032() {
-  const res = await fetch(TESOURO_CSV_URL, { headers: { 'User-Agent': UA } });
+  // Timeout obrigatório: são ~14 MB de CSV, e este download é aguardado ANTES de todo o
+  // resto do ciclo lento. Sem limite, um travamento aqui segura sparkline, 12 meses,
+  // notícias, clima e juros reais por tempo indeterminado, sem erro nenhum no log.
+  const res = await fetch(TESOURO_CSV_URL, {
+    headers: { 'User-Agent': UA },
+    signal: AbortSignal.timeout(60000),
+  });
   if (!res.ok) throw new Error(`Tesouro Transparente: HTTP ${res.status}`);
   const text = await res.text();
   const lines = text.split('\n');
@@ -1678,7 +1698,14 @@ async function refreshSlowData() {
     refreshCompanyNews(),
     refreshCalendar(),
   ]);
-  cache.errors = [...tesouro, ...jobs].filter((r) => r.status === 'rejected').map((r) => r.reason.message);
+  // Com o nome do job na frente: "The operation was aborted due to timeout" sozinho não
+  // diz qual das doze fontes caiu, e várias usam a mesma mensagem de timeout.
+  const nomes = ['Tesouro', 'IPCA', 'CPI', 'Juros reais', 'DI futuro', 'Fear & Greed',
+    'Clima', 'Histórico 12m', 'Notícias', 'Notícias macro', 'Notícias empresas', 'Calendário'];
+  cache.errors = [...tesouro, ...jobs]
+    .map((r, i) => ({ nome: nomes[i] || `Job ${i}`, r }))
+    .filter(({ r }) => r.status === 'rejected')
+    .map(({ nome, r }) => `${nome}: ${r.reason.message}`);
   cache.slowUpdatedAt = new Date().toISOString();
   cache.updatedAt = new Date().toISOString();
 }
