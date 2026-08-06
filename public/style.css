@@ -1661,6 +1661,28 @@ body.emp-arrastando { user-select: none; }
   border-top: 1px solid #c2d2c5;
   padding: 0;
 }
+/* faixa que também carrega o total da seção: o rótulo é célula fixa, não colspan */
+.emp-tabela-fund tr.emp-grupo th.emp-grupo-rot {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: #d7e3d9;
+  text-align: left;
+  white-space: nowrap;
+  padding: 6px 14px;
+  color: var(--green-header);
+  font-weight: 700;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.emp-tabela-fund tr.emp-grupo td.emp-num {
+  padding: 6px 8px;
+  font-weight: 700;
+  color: var(--green-header);
+}
+.emp-tabela-fund tr.emp-grupo td.emp-num.neg { color: var(--red-down); }
+
 /* o span acompanha a rolagem horizontal: sem isso o título some ao rolar para 2015 */
 .emp-tabela-fund tr.emp-grupo span {
   position: sticky;

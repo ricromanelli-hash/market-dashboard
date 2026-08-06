@@ -187,7 +187,16 @@ const COLUNAS_DRE = [
   { chave: 'lucroBruto', rotulo: 'Lucro Bruto', tipo: 'mi', nivel: 0, forte: true },
   { chave: 'margemBruta', rotulo: 'Margem bruta', tipo: 'pct1', nivel: 1 },
   { chave: 'margemBruta10y', rotulo: 'Margem bruta · média 10 anos', tipo: 'pct1', nivel: 1 },
-  { chave: 'dvga', rotulo: 'D. Vendas/Gerais/Administrativas', tipo: 'mi', nivel: 1, grupo: 'Despesas operacionais' },
+  {
+    chave: 'dvga',
+    rotulo: 'D. Vendas/Gerais/Administrativas',
+    tipo: 'mi',
+    nivel: 1,
+    grupo: 'Despesas operacionais',
+    // soma exibida na própria faixa da seção; é líquida, porque a equivalência
+    // patrimonial entra positiva. Fecha com EBIT − Lucro Bruto.
+    grupoTotal: { chaves: ['dvga', 'eqPatr', 'outrasRd'], tipo: 'mi' },
+  },
   { chave: 'dvgaSobreLb', rotulo: 'DVGA / Lucro Bruto', tipo: 'pct1', nivel: 1 },
   { chave: 'eqPatr', rotulo: 'Equivalência Patrimonial', tipo: 'mi', nivel: 1 },
   { chave: 'outrasRd', rotulo: 'Outras Despesas / Receitas', tipo: 'mi', nivel: 1 },
@@ -1190,10 +1199,21 @@ function renderTabelaTransposta(dados) {
   let grupo = null;
   const corpo = COLUNAS().map((c, i) => {
     let titulo = '';
-    if (c.grupo && c.grupo !== grupo) { // a DRE não tem seções: é uma cascata só
+    if (c.grupo && c.grupo !== grupo) {
       grupo = c.grupo;
-      // o span fixo mantém o título da seção à vista mesmo com a tabela rolada
-      titulo = `<tr class="emp-grupo"><td colspan="${periodos.length + 1}"><span>${esc(c.grupo)}</span></td></tr>`;
+      if (c.grupoTotal) {
+        // faixa com o total da seção: título fixo à esquerda e uma célula por período
+        const somas = periodos.map((l) => {
+          const parcelas = c.grupoTotal.chaves.map((ch) => l[ch]).filter((v) => typeof v === 'number');
+          if (!parcelas.length) return '<td class="emp-num">—</td>';
+          const soma = parcelas.reduce((s, v) => s + v, 0);
+          return `<td class="emp-num${soma < 0 ? ' neg' : ''}">${formata(soma, c.grupoTotal.tipo)}</td>`;
+        }).join('');
+        titulo = `<tr class="emp-grupo"><th scope="row" class="emp-grupo-rot">${esc(c.grupo)}</th>${somas}</tr>`;
+      } else {
+        // o span fixo mantém o título da seção à vista mesmo com a tabela rolada
+        titulo = `<tr class="emp-grupo"><td colspan="${periodos.length + 1}"><span>${esc(c.grupo)}</span></td></tr>`;
+      }
     }
     const celulas = periodos.map((l) => {
       const valor = l[c.chave];
