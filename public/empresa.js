@@ -1248,20 +1248,24 @@ function renderAbas() {
 // valores nas linhas que já existem — assim a tabela transposta e o gráfico funcionam sem
 // saber que esta aba é diferente. A chave leva o índice do grupo porque o mesmo código de
 // conta ("1.01") existe em demonstrações diferentes com significados distintos.
-// Quatro níveis abertos ("1", "1.01", "1.01.02", "1.01.02.01"); daí para baixo, sob
-// demanda. `abertos` guarda os códigos cujos filhos estão à mostra — começa com tudo até
-// dois pontos, o que deixa exatamente esses quatro níveis visíveis.
-const NIVEIS_ABERTOS = 2;
+// Três níveis abertos; daí para baixo, sob demanda. `abertos` guarda os códigos cujos
+// filhos estão à mostra — começa com tudo até um ponto, o que deixa três níveis visíveis.
+const NIVEIS_ABERTOS = 1;
 const paiDe = (cd) => (cd.includes('.') ? cd.slice(0, cd.lastIndexOf('.')) : null);
 
 function montaColunasCvm(aba) {
   const g = aba.dados.grupos[aba.grupoAtivo];
   const chaveDe = (cd) => `cvm${aba.grupoAtivo}_${cd.replace(/\./g, '_')}`;
-  const temFilho = new Set(g.contas.map((c) => paiDe(c.cd)).filter(Boolean));
+  const existe = new Set(g.contas.map((c) => c.cd));
+  const temFilho = new Set(g.contas.map((c) => paiDe(c.cd)).filter((cd) => cd && existe.has(cd)));
   const visivel = new Map();
   aba.colunas = g.contas.map((c) => {
+    // Conta cujo pai não existe na demonstração é raiz. A DRE começa em "3.01" e a DFC em
+    // "6.01", sem as contas "3" e "6" — sem esta guarda as duas apareciam em branco,
+    // porque toda linha ficava pendurada num pai inexistente.
     const pai = paiDe(c.cd);
-    const aparece = pai === null ? true : Boolean(visivel.get(pai)) && aba.abertos.has(pai);
+    const raiz = pai === null || !existe.has(pai);
+    const aparece = raiz ? true : Boolean(visivel.get(pai)) && aba.abertos.has(pai);
     visivel.set(c.cd, aparece);
     const abre = temFilho.has(c.cd)
       ? `<button type="button" class="emp-exp" data-exp="${esc(c.cd)}" aria-label="abrir ou fechar ${esc(c.cd)}">${aba.abertos.has(c.cd) ? '▾' : '▸'}</button>`
@@ -1282,7 +1286,14 @@ function aplicaGrupoCvm(aba, indice) {
   const g = aba.dados.grupos[indice];
   if (!g) return;
   aba.grupoAtivo = indice;
-  aba.abertos = new Set(g.contas.map((c) => c.cd).filter((cd) => (cd.match(/\./g) || []).length <= NIVEIS_ABERTOS));
+  // A profundidade é contada a partir da raiz de cada demonstração, não do número de
+  // pontos: o balanço tem raiz "1" e a DRE começa em "3.01". Sem isso a DRE abria um
+  // nível a menos que o balanço.
+  const profundidade = (cd) => (cd.match(/\./g) || []).length;
+  const raiz = Math.min(...g.contas.map((c) => profundidade(c.cd)));
+  aba.abertos = new Set(g.contas
+    .map((c) => c.cd)
+    .filter((cd) => profundidade(cd) <= raiz + NIVEIS_ABERTOS));
   // casa pelo ano; a linha do TTM é trimestral e não tem correspondente anual na CVM
   const chaveDe = (cd) => `cvm${indice}_${cd.replace(/\./g, '_')}`;
   DADOS.linhas.forEach((linha) => {
