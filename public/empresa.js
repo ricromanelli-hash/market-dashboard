@@ -447,7 +447,8 @@ const ABAS = [
   { id: 'dfc', rotulo: 'DFC Resumido', colunas: COLUNAS_DFC, layout: 'transposta' },
   // As contas vêm do próprio layout da CVM e mudam de empresa para empresa, então esta
   // aba monta as colunas depois de buscar os dados, na primeira vez que é aberta.
-  { id: 'dfs', rotulo: 'DFs CVM (Anual)', colunas: [], layout: 'transposta', dinamica: true },
+  { id: 'dfs', rotulo: 'DFs CVM (Anual)', colunas: [], layout: 'transposta', dinamica: true, fonte: 'anual' },
+  { id: 'dfstri', rotulo: 'DFs CVM (Trimestral)', colunas: [], layout: 'transposta', dinamica: true, fonte: 'trimestral' },
 ];
 
 const MS_ANO = 365.25 * 24 * 60 * 60 * 1000;
@@ -764,7 +765,12 @@ function janela(linhas) {
   return linhas.filter((l) => l.ttm || mantidos.has(l));
 }
 
-const rotuloCurto = (l) => (l.ttm ? 'TTM' : String(l.ano ?? periodo(l)));
+// `rotulo` vem pronto nas abas da CVM, que trazem os próprios períodos (2025, 3T25…)
+const rotuloCurto = (l) => l.rotulo || (l.ttm ? 'TTM' : String(l.ano ?? periodo(l)));
+
+// A aba da CVM carrega os próprios períodos; as demais usam as linhas do endpoint de
+// indicadores. Tabela e gráfico leem daqui para não precisar saber de qual aba vêm.
+const linhasAtivas = () => (ABA.linhas ? ABA.linhas : DADOS.linhas);
 
 function quantil(ordenados, q) {
   if (!ordenados.length) return null;
@@ -793,8 +799,8 @@ function pontosDoIndicador(indice) {
   const coluna = COLUNAS()[indice];
   const ponto = (l) => ({ rotulo: rotuloCurto(l), valor: l[coluna.chave] });
   const numerico = (p) => typeof p.valor === 'number';
-  const serieCheia = DADOS.linhas.map(ponto).filter(numerico);
-  const todos = janela(DADOS.linhas).map(ponto).filter(numerico);
+  const serieCheia = linhasAtivas().map(ponto).filter(numerico);
+  const todos = janela(linhasAtivas()).map(ponto).filter(numerico);
   // Os limites saem da série inteira, mesmo com a janela apertada: calculados só sobre
   // 5 anos os quartis ficam tão estreitos que um bom ano vira "anomalia" — o EBITDA de
   // 2022 da PETR4 era cortado ao escolher 5 anos e voltava ao escolher 10.
@@ -837,7 +843,7 @@ function escalaY(valores, faixas = FAIXAS) {
 // quem manda no recorte (janela + anomalias) é sempre a série que foi clicada.
 function serieAlinhada(indice, mostrados) {
   const coluna = COLUNAS()[indice];
-  const porRotulo = new Map(DADOS.linhas.map((l) => [rotuloCurto(l), l]));
+  const porRotulo = new Map(linhasAtivas().map((l) => [rotuloCurto(l), l]));
   const valores = mostrados.map((p) => {
     const linha = porRotulo.get(p.rotulo);
     const v = linha ? linha[coluna.chave] : null;
@@ -1286,6 +1292,17 @@ function aplicaGrupoCvm(aba, indice) {
   const g = aba.dados.grupos[indice];
   if (!g) return;
   aba.grupoAtivo = indice;
+  // Esta aba traz os próprios períodos — anos na anual, trimestres na trimestral — em vez
+  // de reaproveitar as linhas do endpoint de indicadores, que são sempre anuais.
+  const chaveValor = (cd) => `cvm${indice}_${cd.replace(/\./g, '_')}`;
+  aba.linhas = g.periodos.map((p) => {
+    const linha = { data: p.data, rotulo: p.rotulo, ano: Number(p.data.slice(0, 4)) };
+    g.contas.forEach((c) => {
+      const v = c.valores[p.data];
+      linha[chaveValor(c.cd)] = typeof v === 'number' ? v : null;
+    });
+    return linha;
+  });
   // A profundidade é contada a partir da raiz de cada demonstração, não do número de
   // pontos: o balanço tem raiz "1" e a DRE começa em "3.01". Sem isso a DRE abria um
   // nível a menos que o balanço.
@@ -1294,14 +1311,6 @@ function aplicaGrupoCvm(aba, indice) {
   aba.abertos = new Set(g.contas
     .map((c) => c.cd)
     .filter((cd) => profundidade(cd) <= raiz + NIVEIS_ABERTOS));
-  // casa pelo ano; a linha do TTM é trimestral e não tem correspondente anual na CVM
-  const chaveDe = (cd) => `cvm${indice}_${cd.replace(/\./g, '_')}`;
-  DADOS.linhas.forEach((linha) => {
-    g.contas.forEach((c) => {
-      const v = c.valores[String(linha.ano)];
-      linha[chaveDe(c.cd)] = typeof v === 'number' ? v : null;
-    });
-  });
   montaColunasCvm(aba);
 }
 
@@ -1310,7 +1319,7 @@ async function carregaAbaDinamica(aba) {
   conteudoEl.innerHTML = '<p class="loading">Carregando as demonstrações da CVM…</p>';
   aba.carregada = true;
   try {
-    const res = await fetch(`/api/dfs/${TICKER}`, { cache: 'no-store' });
+    const res = await fetch(`/api/dfs/${aba.fonte}/${TICKER}`, { cache: 'no-store' });
     const dados = await res.json();
     if (!res.ok) throw new Error(dados.error || `HTTP ${res.status}`);
     if (dados.vazio || !dados.grupos.length) {
@@ -1545,8 +1554,9 @@ function renderControles(linhas) {
 
 // Aba fundamentalista: anos em colunas, do mais recente para o mais antigo, e um
 // indicador por linha. Clicar na linha abre o mesmo gráfico das outras abas.
-function renderTabelaTransposta(dados) {
-  const periodos = [...dados.linhas].reverse();
+function renderTabelaTransposta() {
+  const linhas = linhasAtivas();
+  const periodos = [...linhas].reverse();
   const cabecalho = periodos.map((l) => `<th class="g-ano">${esc(rotuloCurto(l))}</th>`).join('');
   let grupo = null;
   const corpo = COLUNAS().map((c, i) => {
@@ -1577,7 +1587,7 @@ function renderTabelaTransposta(dados) {
     const celulas = periodos.map((l) => {
       // coluna calculada recebe a série inteira: existe para comparar o período com ela
       if (c.calcula) {
-        const saida = c.calcula(l, dados.linhas);
+        const saida = c.calcula(l, linhas);
         const dica = saida.dica ? ` title="${esc(saida.dica)}"` : '';
         return `<td class="emp-num emp-calculada"${dica}>${esc(saida.texto)}</td>`;
       }
@@ -1603,7 +1613,7 @@ function renderTabelaTransposta(dados) {
 }
 
 function renderTabela(dados) {
-  if (ABA.layout === 'transposta') return renderTabelaTransposta(dados);
+  if (ABA.layout === 'transposta') return renderTabelaTransposta();
   const cabecalho = COLUNAS()
     .map((c) => {
       const clicavel = c.tipo !== 'texto';

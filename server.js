@@ -1860,7 +1860,15 @@ function parteGrupo(grupo) {
   return { escopo: consolidado ? 'Consolidado' : 'Individual', nome };
 }
 
-async function carregaDfsCvm(ticker) {
+const TRIMESTRES_EXIBIDOS = 20; // ~5 anos: com 16 anos de ITR seriam 64 colunas
+
+// "2026-03-31" -> "1T26"
+function rotuloTrimestre(data) {
+  const [ano, mes] = String(data).split('-');
+  return `${Math.ceil(Number(mes) / 3)}T${ano.slice(2)}`;
+}
+
+async function carregaDfsCvm(ticker, { tabela, trimestral }) {
   const papeis = await supabaseSelect('ac_ticker', `select=cd_cvm,nome_curto&ticker=eq.${ticker}&limit=1`);
   if (!papeis.length) throw new Error(`Ticker ${ticker} não encontrado`);
   const cvm = papeis[0].cd_cvm;
@@ -1872,11 +1880,11 @@ async function carregaDfsCvm(ticker) {
   // estável (data, grupo, conta) para o offset não pular nem repetir linha.
   const PAGINA = 1000;
   const bruto = [];
-  for (let offset = 0; offset < 20000; offset += PAGINA) {
+  for (let offset = 0; offset < 40000; offset += PAGINA) {
     // eslint-disable-next-line no-await-in-loop
     const pagina = await supabaseSelect(
-      'cvm_dfanual',
-      'select=CD_CONTA,DS_CONTA,DT_FIM_EXERC,VL_CONTA,ESCALA_MOEDA,DENOM_CIA,GRUPO_DFP'
+      tabela,
+      'select=CD_CONTA,DS_CONTA,DT_INI_EXERC,DT_FIM_EXERC,VL_CONTA,ESCALA_MOEDA,DENOM_CIA,GRUPO_DFP'
         + `&CD_CVM=eq.${cvm}&ORDEM_EXERC=eq.%C3%9ALTIMO`
         + `&order=DT_FIM_EXERC.desc,GRUPO_DFP.asc,CD_CONTA.asc&limit=${PAGINA}&offset=${offset}`,
     );
@@ -1885,16 +1893,29 @@ async function carregaDfsCvm(ticker) {
   }
   if (!bruto.length) return { ticker, cvm, vazio: true, grupos: [] };
 
-  const porGrupo = new Map();
+  // No ITR cada data de fechamento aparece duas vezes na DRE: o acumulado do ano
+  // (01/01 até a data) e o trimestre isolado. Fica o mais curto — o trimestre — e, onde
+  // só existe o acumulado (é o caso da DFC), fica ele mesmo.
+  const duracao = (r) => (r.DT_INI_EXERC
+    ? (new Date(r.DT_FIM_EXERC) - new Date(r.DT_INI_EXERC)) / 86400000
+    : 0);
+  const maisCurto = new Map();
   for (const r of bruto) {
+    const chave = `${r.GRUPO_DFP}|${r.DT_FIM_EXERC}|${r.CD_CONTA}`;
+    const atual = maisCurto.get(chave);
+    if (!atual || duracao(r) < duracao(atual)) maisCurto.set(chave, r);
+  }
+
+  const porGrupo = new Map();
+  for (const r of maisCurto.values()) {
     // agrupa pelo par escopo+demonstração, não pelo GRUPO_DFP cru: é isso que junta as
     // duas metades do balanço numa entrada só do seletor
     const { escopo, nome } = parteGrupo(r.GRUPO_DFP);
     const chave = `${escopo}|${nome}`;
-    if (!porGrupo.has(chave)) porGrupo.set(chave, { escopo, nome, contas: new Map(), anos: new Set() });
+    if (!porGrupo.has(chave)) porGrupo.set(chave, { escopo, nome, contas: new Map(), periodos: new Map() });
     const g = porGrupo.get(chave);
-    const ano = String(r.DT_FIM_EXERC).slice(0, 4);
-    g.anos.add(ano);
+    const data = String(r.DT_FIM_EXERC);
+    g.periodos.set(data, trimestral ? rotuloTrimestre(data) : data.slice(0, 4));
     const cd = r.CD_CONTA;
     if (!g.contas.has(cd)) {
       g.contas.set(cd, { cd, ds: r.DS_CONTA, nivel: (cd.match(/\./g) || []).length, valores: {} });
@@ -1902,17 +1923,26 @@ async function carregaDfsCvm(ticker) {
     // a CVM publica estes arquivos em MIL; o painel inteiro fala em milhões
     const escala = r.ESCALA_MOEDA === 'UNIDADE' ? 1e6 : 1e3;
     const v = num(r.VL_CONTA);
-    g.contas.get(cd).valores[ano] = v === null ? null : +(v / escala).toFixed(0);
+    g.contas.get(cd).valores[data] = v === null ? null : +(v / escala).toFixed(0);
   }
 
-  const grupos = [...porGrupo.values()].map((g) => ({
-    escopo: g.escopo,
-    nome: g.nome,
-    anos: [...g.anos].sort((a, b) => Number(b) - Number(a)),
-    // "3.01" < "3.02" < "3.10": os códigos vêm com dois dígitos, então a ordem
-    // alfabética já é a ordem da demonstração — e põe o ativo (1.x) antes do passivo (2.x)
-    contas: [...g.contas.values()].sort((a, b) => a.cd.localeCompare(b.cd)),
-  }));
+  const grupos = [...porGrupo.values()].map((g) => {
+    // do mais antigo para o mais recente; a tabela inverte na hora de desenhar
+    let periodos = [...g.periodos.entries()]
+      .map(([data, rotulo]) => ({ data, rotulo }))
+      .sort((a, b) => a.data.localeCompare(b.data));
+    if (trimestral && periodos.length > TRIMESTRES_EXIBIDOS) {
+      periodos = periodos.slice(-TRIMESTRES_EXIBIDOS);
+    }
+    return {
+      escopo: g.escopo,
+      nome: g.nome,
+      periodos,
+      // "3.01" < "3.02" < "3.10": os códigos vêm com dois dígitos, então a ordem
+      // alfabética já é a ordem da demonstração — e põe o ativo (1.x) antes do passivo (2.x)
+      contas: [...g.contas.values()].sort((a, b) => a.cd.localeCompare(b.cd)),
+    };
+  });
   // consolidado antes do individual, e dentro de cada escopo na ordem BP, DRE, DFC
   const ordem = ['Balanço Patrimonial', 'DRE', 'DFC (Método Indireto)', 'DFC (Método Direto)'];
   grupos.sort((a, b) => (a.escopo === b.escopo
@@ -1928,13 +1958,23 @@ async function carregaDfsCvm(ticker) {
   };
 }
 
-app.get('/api/dfs/:ticker', async (req, res) => {
+// Mesma leitura em duas periodicidades: cvm_dfanual tem os exercícios encerrados,
+// cvm_itrtrimestral tem os trimestres.
+const FONTES_DFS = {
+  anual: { tabela: 'cvm_dfanual', trimestral: false },
+  trimestral: { tabela: 'cvm_itrtrimestral', trimestral: true },
+};
+
+app.get('/api/dfs/:periodicidade/:ticker', async (req, res) => {
+  const fonte = FONTES_DFS[req.params.periodicidade];
+  if (!fonte) return res.status(400).json({ error: 'periodicidade inválida' });
   const ticker = String(req.params.ticker || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
-  const emCache = dfsCache.get(ticker);
+  const chave = `${req.params.periodicidade}|${ticker}`;
+  const emCache = dfsCache.get(chave);
   if (emCache && Date.now() - emCache.quando < DFS_CACHE_MS) return res.json(emCache.dados);
   try {
-    const dados = await carregaDfsCvm(ticker);
-    dfsCache.set(ticker, { quando: Date.now(), dados });
+    const dados = await carregaDfsCvm(ticker, fonte);
+    dfsCache.set(chave, { quando: Date.now(), dados });
     return res.json(dados);
   } catch (err) {
     return res.status(502).json({ error: err.message, ticker });
