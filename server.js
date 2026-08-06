@@ -1839,6 +1839,72 @@ app.get('/api/data', (req, res) => {
   res.json({ ...cache, version: VERSION });
 });
 
+// ---- DRE detalhada, direto do layout da CVM (cvm_dfanual) ----
+// Aqui o conjunto de contas não é fixo: varia de empresa para empresa e até de ano para
+// ano dentro da mesma empresa, então as linhas da tabela saem dos próprios dados.
+const DRE_CACHE_MS = 60 * 60 * 1000;
+const dreCache = new Map();
+
+async function carregaDreDetalhada(ticker) {
+  const papeis = await supabaseSelect('ac_ticker', `select=cd_cvm,nome_curto&ticker=eq.${ticker}&limit=1`);
+  if (!papeis.length) throw new Error(`Ticker ${ticker} não encontrado`);
+  const cvm = papeis[0].cd_cvm;
+
+  const campos = 'CD_CONTA,DS_CONTA,DT_FIM_EXERC,VL_CONTA,ESCALA_MOEDA,DENOM_CIA';
+  const busca = (grupo) => supabaseSelect(
+    'cvm_dfanual',
+    `select=${campos}&CD_CVM=eq.${cvm}&GRUPO_DFP=eq.${encodeURIComponent(grupo)}`
+      + '&ORDEM_EXERC=eq.%C3%9ALTIMO&order=DT_FIM_EXERC.desc&limit=4000',
+  );
+  // Consolidado é o que interessa em holding; quem não publica consolidado cai no individual.
+  let bruto = await busca('DF Consolidado - Demonstração do Resultado');
+  let origem = 'consolidado';
+  if (!bruto.length) {
+    bruto = await busca('DF Individual - Demonstração do Resultado');
+    origem = 'individual';
+  }
+  if (!bruto.length) return { ticker, cvm, vazio: true, contas: [], anos: [] };
+
+  const anos = [...new Set(bruto.map((r) => String(r.DT_FIM_EXERC).slice(0, 4)))]
+    .sort((a, b) => Number(b) - Number(a));
+  const porConta = new Map();
+  for (const r of bruto) {
+    const cd = r.CD_CONTA;
+    if (!porConta.has(cd)) {
+      porConta.set(cd, { cd, ds: r.DS_CONTA, nivel: (cd.match(/\./g) || []).length, valores: {} });
+    }
+    // a CVM publica esta demonstração em MIL; o painel inteiro fala em milhões
+    const escala = r.ESCALA_MOEDA === 'UNIDADE' ? 1e6 : 1e3;
+    const v = num(r.VL_CONTA);
+    porConta.get(cd).valores[String(r.DT_FIM_EXERC).slice(0, 4)] = v === null ? null : +(v / escala).toFixed(0);
+  }
+  // "3.01" < "3.02" < "3.10": os códigos vêm com dois dígitos, então a ordem alfabética
+  // já é a ordem da demonstração
+  const contas = [...porConta.values()].sort((a, b) => a.cd.localeCompare(b.cd));
+  return {
+    ticker,
+    cvm,
+    empresa: bruto[0].DENOM_CIA || papeis[0].nome_curto,
+    origem,
+    unidade: 'R$ milhões',
+    anos,
+    contas,
+  };
+}
+
+app.get('/api/dre/:ticker', async (req, res) => {
+  const ticker = String(req.params.ticker || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+  const emCache = dreCache.get(ticker);
+  if (emCache && Date.now() - emCache.quando < DRE_CACHE_MS) return res.json(emCache.dados);
+  try {
+    const dados = await carregaDreDetalhada(ticker);
+    dreCache.set(ticker, { quando: Date.now(), dados });
+    return res.json(dados);
+  } catch (err) {
+    return res.status(502).json({ error: err.message, ticker });
+  }
+});
+
 app.get('/api/empresa/:ticker', async (req, res) => {
   // o ticker entra numa query PostgREST, então só passam letras e números
   const ticker = String(req.params.ticker || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);

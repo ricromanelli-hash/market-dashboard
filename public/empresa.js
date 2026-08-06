@@ -445,6 +445,9 @@ const ABAS = [
   { id: 'dre', rotulo: 'DRE Resumida', colunas: COLUNAS_DRE, layout: 'transposta' },
   { id: 'bal', rotulo: 'Balanço Resumido', colunas: COLUNAS_BALANCO, layout: 'transposta' },
   { id: 'dfc', rotulo: 'DFC Resumido', colunas: COLUNAS_DFC, layout: 'transposta' },
+  // As contas vêm do próprio layout da CVM e mudam de empresa para empresa, então esta
+  // aba monta as colunas depois de buscar os dados, na primeira vez que é aberta.
+  { id: 'dredet', rotulo: 'DRE Detalhada', colunas: [], layout: 'transposta', dinamica: true },
 ];
 
 const MS_ANO = 365.25 * 24 * 60 * 60 * 1000;
@@ -1210,15 +1213,58 @@ function renderAbas() {
     .map((a) => `<button type="button" class="emp-aba${a.id === ABA.id ? ' ativa' : ''}" data-aba="${a.id}">${esc(a.rotulo)}</button>`)
     .join('');
   abasEl.hidden = false;
-  abasEl.addEventListener('click', (ev) => {
+  abasEl.addEventListener('click', async (ev) => {
     const botao = ev.target.closest('.emp-aba');
     if (!botao) return;
     const nova = ABAS.find((a) => a.id === botao.dataset.aba);
     if (!nova || nova.id === ABA.id) return;
     fechaGrafico(); // o índice da coluna aberta era o da outra aba
     grafico.series = [];
+    if (nova.dinamica) {
+      // marca a aba antes de buscar, para a espera não parecer clique perdido
+      abasEl.querySelectorAll('.emp-aba').forEach((b) => {
+        b.classList.toggle('ativa', b.dataset.aba === nova.id);
+      });
+      await carregaAbaDinamica(nova);
+    }
     trocaAba(nova);
   });
+}
+
+// Busca as contas da CVM e as transforma em colunas desta aba, escrevendo os valores nas
+// linhas que já existem — assim a tabela transposta e o gráfico funcionam sem saber que
+// esta aba é diferente das outras.
+async function carregaAbaDinamica(aba) {
+  if (aba.carregada) return;
+  conteudoEl.innerHTML = '<p class="loading">Carregando a DRE detalhada…</p>';
+  aba.carregada = true;
+  try {
+    const res = await fetch(`/api/dre/${TICKER}`, { cache: 'no-store' });
+    const dados = await res.json();
+    if (!res.ok) throw new Error(dados.error || `HTTP ${res.status}`);
+    if (dados.vazio || !dados.contas.length) {
+      aba.erro = 'Esta empresa não tem DRE detalhada publicada na base da CVM.';
+      return;
+    }
+    const chaveDe = (cd) => `cvm${cd.replace(/\./g, '_')}`;
+    aba.colunas = dados.contas.map((c) => ({
+      chave: chaveDe(c.cd),
+      rotulo: `${c.cd} · ${c.ds}`,
+      tipo: 'mi',
+      nivel: Math.min(c.nivel - 1, 2), // 3.01 na margem, 3.04.06.01 recuado duas vezes
+      forte: c.nivel === 1,
+    }));
+    // casa pelo ano; a linha do TTM é trimestral e não tem correspondente anual na CVM
+    DADOS.linhas.forEach((linha) => {
+      dados.contas.forEach((c) => {
+        const v = c.valores[String(linha.ano)];
+        linha[chaveDe(c.cd)] = typeof v === 'number' ? v : null;
+      });
+    });
+    aba.origem = dados.origem;
+  } catch (err) {
+    aba.erro = err.message;
+  }
 }
 
 // Só a tabela: quem chama decide o que fazer com o gráfico aberto — trocar de aba pelo
@@ -1229,7 +1275,9 @@ function trocaAba(nova) {
     b.classList.toggle('ativa', b.dataset.aba === ABA.id);
   });
   fechaBalao();
-  conteudoEl.innerHTML = renderTabela(DADOS);
+  conteudoEl.innerHTML = ABA.erro
+    ? aviso('Não foi possível montar esta aba.', ABA.erro)
+    : renderTabela(DADOS);
   atualizaVariacao();
   renderGaleria(); // a barra é filtrada pela aba
   // De/Até e o rodapé de variação pressupõem períodos em linhas: na tabela transposta
