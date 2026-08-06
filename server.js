@@ -2047,7 +2047,9 @@ app.get('/api/dfs/:periodicidade/:ticker', async (req, res) => {
   const ticker = String(req.params.ticker || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
   const chave = `${req.params.periodicidade}|${ticker}`;
   const emCache = dfsCache.get(chave);
-  if (emCache && Date.now() - emCache.quando < DFS_CACHE_MS) return res.json(emCache.dados);
+  // ?recarregar=1 pula o cache: é o botão de atualizar da página da empresa
+  const forcar = req.query.recarregar === '1';
+  if (!forcar && emCache && Date.now() - emCache.quando < DFS_CACHE_MS) return res.json(emCache.dados);
   try {
     const dados = await carregaDfsCvm(ticker, fonte);
     dfsCache.set(chave, { quando: Date.now(), dados });
@@ -2062,7 +2064,9 @@ app.get('/api/empresa/:ticker', async (req, res) => {
   const ticker = String(req.params.ticker || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
   if (!ticker) return res.status(400).json({ error: 'ticker inválido' });
   const emCache = kpiCache.get(ticker);
-  if (emCache && Date.now() - emCache.quando < KPI_CACHE_MS) return res.json(emCache.dados);
+  // ?recarregar=1 pula o cache: é o botão de atualizar da página da empresa
+  const forcar = req.query.recarregar === '1';
+  if (!forcar && emCache && Date.now() - emCache.quando < KPI_CACHE_MS) return res.json(emCache.dados);
   try {
     const dados = await carregaIndicadores(ticker);
     kpiCache.set(ticker, { quando: Date.now(), dados });

@@ -1322,7 +1322,9 @@ async function carregaAbaDinamica(aba) {
   conteudoEl.innerHTML = '<p class="loading">Carregando as demonstrações da CVM…</p>';
   aba.carregada = true;
   try {
-    const res = await fetch(`/api/dfs/${aba.fonte}/${TICKER}`, { cache: 'no-store' });
+    const forcar = aba.forcar ? '?recarregar=1' : '';
+    aba.forcar = false;
+    const res = await fetch(`/api/dfs/${aba.fonte}/${TICKER}${forcar}`, { cache: 'no-store' });
     const dados = await res.json();
     if (!res.ok) throw new Error(dados.error || `HTTP ${res.status}`);
     if (dados.vazio || !dados.grupos.length) {
@@ -1330,7 +1332,11 @@ async function carregaAbaDinamica(aba) {
       return;
     }
     aba.dados = dados;
-    aplicaGrupoCvm(aba, 0); // o servidor já devolve na ordem: consolidado, BP, DRE, DFC
+    // volta para a demonstração que estava aberta, se ela ainda existir; senão, a
+    // primeira — o servidor devolve na ordem consolidado, BP, DRE, DFC
+    const desejado = aba.grupoDesejado;
+    aba.grupoDesejado = undefined;
+    aplicaGrupoCvm(aba, desejado !== undefined && dados.grupos[desejado] ? desejado : 0);
   } catch (err) {
     aba.erro = err.message;
   }
@@ -1642,6 +1648,49 @@ function renderTabela(dados) {
   </div>`;
 }
 
+// Botão de atualizar: refaz as buscas ignorando o cache de uma hora do servidor. Serve
+// para depois de o ETL recarregar a base, quando esperar o cache vencer não é opção.
+async function recarrega() {
+  const botao = document.getElementById('empRecarregar');
+  const rotulo = botao.textContent;
+  botao.disabled = true;
+  botao.textContent = '↻ Atualizando…';
+  try {
+    const res = await fetch(`/api/empresa/${TICKER}?recarregar=1`, { cache: 'no-store' });
+    const dados = await res.json();
+    if (!res.ok) throw new Error(dados.error || `HTTP ${res.status}`);
+    DADOS = dados;
+    // as abas da CVM guardam os próprios dados e períodos: zera para buscarem de novo
+    ABAS.filter((a) => a.dinamica).forEach((a) => {
+      Object.assign(a, {
+        carregada: false,
+        forcar: true,
+        grupoDesejado: a.grupoAtivo, // para a aba voltar na demonstração que estava aberta
+        dados: null,
+        linhas: null,
+        colunas: [],
+        erro: null,
+      });
+    });
+    fechaGrafico();
+    fechaBalao();
+    if (ABA.dinamica) await carregaAbaDinamica(ABA);
+    conteudoEl.innerHTML = ABA.erro ? aviso('Não foi possível montar esta aba.', ABA.erro) : renderTabela(DADOS);
+    if (DADOS.linhas.length > 1 && !ABA.layout) {
+      renderControles(DADOS.linhas);
+      atualizaVariacao();
+    }
+    if (ABA.dinamica) renderSeletorCvm();
+    botao.textContent = '✓ Atualizado';
+  } catch (err) {
+    botao.textContent = '✕ Falhou';
+    subEl.textContent = `Não foi possível atualizar: ${err.message}`;
+  } finally {
+    botao.disabled = false;
+    setTimeout(() => { botao.textContent = rotulo; }, 2500);
+  }
+}
+
 function aviso(texto, detalhe = '') {
   return `<div class="emp-aviso">
     <p>${esc(texto)}</p>
@@ -1672,6 +1721,7 @@ async function carrega() {
     DADOS = dados;
     subEl.textContent = `${dados.unidade} · exercícios encerrados e últimos 12 meses (TTM) · fonte: re_kpi`;
     conteudoEl.innerHTML = renderTabela(dados);
+    document.getElementById('empRecarregar').addEventListener('click', recarrega);
     renderAbas();
     renderGaleria();
     ligaGaleria();
