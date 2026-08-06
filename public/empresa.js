@@ -447,7 +447,7 @@ const ABAS = [
   { id: 'dfc', rotulo: 'DFC Resumido', colunas: COLUNAS_DFC, layout: 'transposta' },
   // As contas vêm do próprio layout da CVM e mudam de empresa para empresa, então esta
   // aba monta as colunas depois de buscar os dados, na primeira vez que é aberta.
-  { id: 'dfs', rotulo: 'DFs CVM', colunas: [], layout: 'transposta', dinamica: true },
+  { id: 'dfs', rotulo: 'DFs CVM (Anual)', colunas: [], layout: 'transposta', dinamica: true },
 ];
 
 const MS_ANO = 365.25 * 24 * 60 * 60 * 1000;
