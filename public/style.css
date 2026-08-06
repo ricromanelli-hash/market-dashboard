@@ -1672,6 +1672,18 @@ body.emp-arrastando { user-select: none; }
   letter-spacing: 0.3px;
 }
 
+/* ---- Realce da linha sob o mouse ---- */
+/* Vem depois de todas as regras de fundo (zebra, TTM, pontas marcadas, coluna fixa)
+   porque empata em especificidade com elas e precisa vencer pela ordem. A coluna fixa
+   entra por último: sem ela a célula do ano ficaria branca enquanto o resto acende. */
+.emp-tabela tbody tr:hover td,
+.emp-tabela tbody tr:hover th,
+.emp-tabela tbody tr:hover .emp-periodo,
+.emp-tabela-fund tbody tr:hover th.emp-ind { background: #eef4ef; }
+
+/* o arrasto continua por cima: durante a seleção o azul é que informa */
+.emp-tabela tbody tr:hover td.emp-arrasto { background: #dbe9f5; }
+
 .emp-aviso {
   margin: 20px;
   padding: 16px 18px;
