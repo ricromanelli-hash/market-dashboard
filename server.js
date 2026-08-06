@@ -1732,6 +1732,38 @@ app.get('/api/data', (req, res) => {
   res.json({ ...cache, version: VERSION });
 });
 
+// TEMPORÁRIO — mostra o que o Yahoo devolve a partir deste servidor. Existe para
+// diagnosticar a variação do dia zerada no Render, onde a resposta difere da recebida
+// numa máquina comum. Remover assim que a causa estiver identificada.
+app.get('/api/debug-quote/:symbol', async (req, res) => {
+  const symbol = String(req.params.symbol || '').replace(/[^A-Za-z0-9.^=-]/g, '').slice(0, 12);
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`;
+    const r = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(20000) });
+    const j = await r.json();
+    const result = j?.chart?.result?.[0];
+    const meta = result?.meta || {};
+    return res.json({
+      symbol,
+      http: r.status,
+      agoraUTC: new Date().toISOString(),
+      meta: {
+        regularMarketPrice: meta.regularMarketPrice,
+        previousClose: meta.previousClose,
+        chartPreviousClose: meta.chartPreviousClose,
+        regularMarketTime: meta.regularMarketTime,
+        exchangeTimezoneName: meta.exchangeTimezoneName,
+      },
+      dias: (result?.timestamp || []).map((t, i) => ({
+        data: new Date(t * 1000).toISOString().slice(0, 10),
+        close: result?.indicators?.quote?.[0]?.close?.[i] ?? null,
+      })),
+    });
+  } catch (err) {
+    return res.status(502).json({ symbol, error: err.message });
+  }
+});
+
 app.get('/api/empresa/:ticker', async (req, res) => {
   // o ticker entra numa query PostgREST, então só passam letras e números
   const ticker = String(req.params.ticker || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
