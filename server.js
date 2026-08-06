@@ -1671,6 +1671,17 @@ function linhaKpi(r) {
   // Se qualquer parcela faltar a soma seria menor do que o custo real, então vira nulo.
   const capm = [r.taxalivrederisco, r.erp, r.rbr, r.dif_inflacao].map(num);
   linha.keCapm = capm.every((v) => v !== null) ? pct(capm.reduce((s, v) => s + v, 0)) : null;
+  // FCFF já vem pronto da base: `fcf` (o econômico, não o `fcf_contabil`) é NOPAT + invae,
+  // conferido em EGIE3 e PETR4 em 2024 e 2025 — que é a definição de fluxo livre para a
+  // firma, com capex e D&A embutidos na variação do ativo não circulante.
+  linha.fcff = milhoes(r.fcf);
+  // Juros depois do imposto, para descontar do FCFF no caminho até o FCFE. A alíquota
+  // efetiva estoura em ano de lucro quase zero (a PETR4 em 2020 dá −16.781%), então só
+  // vale quando cai numa faixa plausível; fora dela usa a nominal de 34%.
+  const aliqEfetiva = num(r.perc_taxasircsllreal);
+  const aliq = aliqEfetiva !== null && aliqEfetiva >= 0 && aliqEfetiva <= 0.5 ? aliqEfetiva : 0.34;
+  const juros = num(r.despesascomjuros);
+  linha.jurosLiq = juros === null ? null : milhoes(juros * (1 - aliq));
   // Variação de caixa do período: soma dos três fluxos contábeis. Confere com o saldo —
   // na EGIE3, caixa de 3.959 em 2024 menos 600 em 2025 dá os 3.359 do fim de 2025.
   const fluxos = [r.fco_contabil, r.fci_contabil, r.fcf_contabil].map(num);
@@ -1731,6 +1742,18 @@ async function carregaIndicadores(ticker) {
   // do mais antigo para o mais novo, com o TTM fechando a tabela
   const linhas = [...anuais.reverse().map(linhaKpi)];
   if (ttm) linhas.push(linhaKpi(ttm));
+  // FCFE = FCFF − juros depois do imposto + captação líquida de dívida. O Δ dívida sai da
+  // própria série, então o período mais antigo não tem com o que comparar e fica sem FCFE.
+  for (let i = 1; i < linhas.length; i += 1) {
+    const antes = linhas[i - 1].divida;
+    const agora = linhas[i].divida;
+    if (typeof antes !== 'number' || typeof agora !== 'number') continue;
+    linhas[i].deltaDivida = agora - antes;
+    const parcelas = [linhas[i].fcff, linhas[i].jurosLiq, linhas[i].deltaDivida];
+    if (parcelas.every((v) => typeof v === 'number')) {
+      linhas[i].fcfe = parcelas.reduce((s, v) => s + v, 0);
+    }
+  }
   return {
     ticker,
     cvm,

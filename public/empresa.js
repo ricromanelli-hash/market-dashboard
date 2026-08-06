@@ -87,7 +87,9 @@ const COLUNAS_EVA = [
   { chave: 'spread', rotulo: 'R x W', tipo: 'pct1', grupo: 'eva' },
   { chave: 'margemNopat', rotulo: 'Mrg Operac', tipo: 'pct1', grupo: 'eva' },
   { chave: 'evaFco', rotulo: 'FCO', tipo: 'mi', grupo: 'caixa' },
-  { chave: 'evaFcf', rotulo: 'FCF', tipo: 'mi', grupo: 'caixa' },
+  // `fcf` da re_kpi é NOPAT + invae, ou seja, o fluxo livre para a firma — nada a ver com
+  // o "FC Financ" da aba de indicadores, que é o fluxo de financiamento contábil
+  { chave: 'evaFcf', rotulo: 'FCFF', tipo: 'mi', grupo: 'caixa' },
   { chave: 'invCapInv', rotulo: 'Inv Cap Inv', tipo: 'mi', grupo: 'caixa' },
   { chave: 'capGiro', rotulo: 'Cap Giro', tipo: 'mi', grupo: 'caixa' },
   { chave: 'anc', rotulo: 'ANC', tipo: 'mi', grupo: 'caixa' },
@@ -406,9 +408,23 @@ const COLUNAS_DFC = [
   { chave: 'fcoSobreLl', rotulo: 'FCO / Lucro Líquido', tipo: 'pct1', nivel: 1 },
   { chave: 'capexSobreLl', rotulo: 'Capex / Lucro Líquido', tipo: 'pct1', nivel: 1 },
 
+  // Caminho do fluxo para a firma até o fluxo para o acionista. A faixa carrega o FCFE,
+  // que é onde o bloco desemboca; as linhas mostram de onde ele sai.
+  {
+    chave: 'fcff',
+    rotulo: 'FCFF · fluxo para a firma',
+    tipo: 'mi',
+    nivel: 1,
+    grupo: 'Fluxo para a firma e para o acionista',
+    grupoTotal: { chaves: ['fcfe'], tipo: 'mi', grafico: 'fcfe' },
+  },
+  { chave: 'jurosLiq', rotulo: '(−) Juros depois do imposto', tipo: 'mi', nivel: 1 },
+  { chave: 'deltaDivida', rotulo: '(+) Captação líquida de dívida', tipo: 'mi', nivel: 1 },
+
   // só para o gráfico das faixas
   { chave: 'varCaixa', rotulo: 'Variação de caixa', tipo: 'mi', oculta: true },
   { chave: 'fcl', rotulo: 'Fluxo de caixa livre (FCL)', tipo: 'mi', oculta: true },
+  { chave: 'fcfe', rotulo: 'FCFE · fluxo para o acionista', tipo: 'mi', oculta: true },
 ];
 
 const ABAS = [
