@@ -1480,6 +1480,8 @@ const CAMPOS_KPI = [
   ['lucroBruto', 'lucro_bruto', milhoes],
   ['margemBruta', 'margem_bruta', pct],
   ['dvga', 'dvga', milhoes],
+  ['eqPatr', 'eq_patr', milhoes],
+  ['outrasRd', 'outras_rd', milhoes],
   ['ebitda', 'ebitda', milhoes],
   ['margemEbitda', 'margem_ebitda', pct],
   ['ebit', 'ebit', milhoes],

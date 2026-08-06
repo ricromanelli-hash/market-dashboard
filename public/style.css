@@ -1640,6 +1640,17 @@ body.emp-arrastando { user-select: none; }
   z-index: 1;
 }
 .emp-tabela-fund th.emp-ind:hover { background: #eef4ef; }
+
+/* recuo da cascata da DRE: subtotal na margem, componentes abaixo dele */
+.emp-tabela-fund th.emp-n0 { padding-left: 14px; }
+.emp-tabela-fund th.emp-n1 { padding-left: 30px; }
+.emp-tabela-fund th.emp-n2 { padding-left: 46px; }
+.emp-tabela-fund th.emp-ind.forte { font-weight: 700; color: var(--green-header); }
+.emp-tabela-fund tr.emp-linha-forte td {
+  font-weight: 700;
+  border-top: 1px solid var(--border);
+}
+.emp-tabela-fund tr.emp-linha-forte th.emp-ind { border-top: 1px solid var(--border); }
 .emp-tabela-fund th.emp-ind-cabeca { z-index: 3; }
 
 .emp-tabela-fund tr.emp-grupo td {

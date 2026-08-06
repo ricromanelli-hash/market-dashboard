@@ -172,10 +172,39 @@ const COLUNAS_FUND = [
   { chave: 'papeis', rotulo: 'Papéis (mi)', tipo: 'mi', grupo: 'Informações adicionais' },
 ];
 
+// DRE na ordem da demonstração, com `nivel` para o recuo e `forte` nos subtotais. As
+// margens de cada subtotal viram linha própria: no card de um período só elas cabem
+// entre parênteses no rótulo, mas aqui cada ano tem a sua.
+const COLUNAS_DRE = [
+  { chave: 'receita', rotulo: 'Receita Líquida', tipo: 'mi', nivel: 0, forte: true },
+  { chave: 'cpv', rotulo: 'Custo produto/serviço vendido (−)', tipo: 'mi', nivel: 1 },
+  { chave: 'lucroBruto', rotulo: 'Lucro Bruto', tipo: 'mi', nivel: 0, forte: true },
+  { chave: 'margemBruta', rotulo: 'Margem bruta', tipo: 'pct1', nivel: 1 },
+  { chave: 'dvga', rotulo: 'D. Vendas/Gerais/Administrativas', tipo: 'mi', nivel: 1 },
+  { chave: 'eqPatr', rotulo: 'Equivalência Patrimonial', tipo: 'mi', nivel: 1 },
+  { chave: 'outrasRd', rotulo: 'Outras Despesas / Receitas', tipo: 'mi', nivel: 1 },
+  { chave: 'ebitda', rotulo: 'EBITDA', tipo: 'mi', nivel: 0, forte: true },
+  { chave: 'margemEbitda', rotulo: 'Margem EBITDA', tipo: 'pct1', nivel: 1 },
+  { chave: 'da', rotulo: 'Depreciação / Amortização', tipo: 'mi', nivel: 1 },
+  { chave: 'ebit', rotulo: 'EBIT', tipo: 'mi', nivel: 0, forte: true },
+  { chave: 'margemEbit', rotulo: 'Margem EBIT', tipo: 'pct1', nivel: 1 },
+  { chave: 'resFin', rotulo: 'Resultado Financeiro', tipo: 'mi', nivel: 1 },
+  { chave: 'varCambial', rotulo: 'Variação Cambial', tipo: 'mi', nivel: 2 },
+  { chave: 'despJuros', rotulo: 'Despesas com juros', tipo: 'mi', nivel: 2 },
+  { chave: 'despJurosPct', rotulo: 'Despesas com juros %', tipo: 'pct1', nivel: 2 },
+  { chave: 'ebt', rotulo: 'EBT', tipo: 'mi', nivel: 0, forte: true },
+  { chave: 'margemEbt', rotulo: 'Margem EBT', tipo: 'pct1', nivel: 1 },
+  { chave: 'impostos', rotulo: 'Impostos', tipo: 'mi', nivel: 1 },
+  { chave: 'impostosPct', rotulo: 'Impostos %', tipo: 'pct1', nivel: 1 },
+  { chave: 'lucro', rotulo: 'Lucro Líquido', tipo: 'mi', nivel: 0, forte: true },
+  { chave: 'margemLiquida', rotulo: 'Margem líquida', tipo: 'pct1', nivel: 1 },
+];
+
 const ABAS = [
   { id: 'kpi', rotulo: 'Indicadores', colunas: COLUNAS_KPI },
   { id: 'eva', rotulo: 'EVA', colunas: COLUNAS_EVA },
   { id: 'fund', rotulo: 'Fundamentalistas', colunas: COLUNAS_FUND, layout: 'transposta' },
+  { id: 'dre', rotulo: 'DRE Resumida', colunas: COLUNAS_DRE, layout: 'transposta' },
 ];
 
 const MS_ANO = 365.25 * 24 * 60 * 60 * 1000;
@@ -1144,7 +1173,7 @@ function renderTabelaTransposta(dados) {
   let grupo = null;
   const corpo = COLUNAS().map((c, i) => {
     let titulo = '';
-    if (c.grupo !== grupo) {
+    if (c.grupo && c.grupo !== grupo) { // a DRE não tem seções: é uma cascata só
       grupo = c.grupo;
       // o span fixo mantém o título da seção à vista mesmo com a tabela rolada
       titulo = `<tr class="emp-grupo"><td colspan="${periodos.length + 1}"><span>${esc(c.grupo)}</span></td></tr>`;
@@ -1154,8 +1183,9 @@ function renderTabelaTransposta(dados) {
       const negativo = typeof valor === 'number' && valor < 0;
       return `<td class="emp-num${negativo ? ' neg' : ''}">${formata(valor, c.tipo)}</td>`;
     }).join('');
-    return `${titulo}<tr data-ind="${i}">
-      <th scope="row" class="emp-ind emp-th-hist" title="ver histórico de ${esc(c.rotulo)}">${esc(c.rotulo)}</th>
+    const classes = ['emp-ind', 'emp-th-hist', `emp-n${c.nivel || 0}`, c.forte ? 'forte' : ''].join(' ');
+    return `${titulo}<tr data-ind="${i}"${c.forte ? ' class="emp-linha-forte"' : ''}>
+      <th scope="row" class="${classes}" title="ver histórico de ${esc(c.rotulo)}">${esc(c.rotulo)}</th>
       ${celulas}
     </tr>`;
   }).join('');
