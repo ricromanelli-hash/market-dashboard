@@ -247,11 +247,66 @@ const COLUNAS_DRE = [
   { chave: 'resFin', rotulo: 'Resultado Financeiro', tipo: 'mi', oculta: true },
 ];
 
+// Balanço no mesmo layout transposto da DRE: os totais de cada lado ficam na faixa da
+// seção e os subtotais viram linha realçada, abrindo os próprios blocos.
+const COLUNAS_BALANCO = [
+  {
+    chave: 'ativoCirc',
+    rotulo: 'Ativo Circulante',
+    tipo: 'mi',
+    nivel: 0,
+    forte: true,
+    realce: true,
+    grupo: 'Ativo',
+    grupoTotal: { chaves: ['totalAtivo'], tipo: 'mi', grafico: 'totalAtivo' },
+  },
+  { chave: 'caixaEquiv', rotulo: 'Caixa e equivalentes', tipo: 'mi', nivel: 1 },
+  { chave: 'aplicacoes', rotulo: 'Aplicações financeiras', tipo: 'mi', nivel: 1 },
+  { chave: 'contasReceber', rotulo: 'Contas a receber', tipo: 'mi', nivel: 1 },
+  { chave: 'estoque', rotulo: 'Estoque', tipo: 'mi', nivel: 1 },
+  { chave: 'ativoNaoCirc', rotulo: 'Ativo Não Circulante', tipo: 'mi', nivel: 0, forte: true, realce: true },
+  { chave: 'investimentos', rotulo: 'Investimentos', tipo: 'mi', nivel: 1 },
+  { chave: 'imobilizado', rotulo: 'Imobilizado', tipo: 'mi', nivel: 1 },
+  { chave: 'intangivel', rotulo: 'Intangível', tipo: 'mi', nivel: 1 },
+  { chave: 'outrosAnc', rotulo: 'Outros', tipo: 'mi', nivel: 1 },
+
+  {
+    chave: 'passivoCirc',
+    rotulo: 'Passivo Circulante',
+    tipo: 'mi',
+    nivel: 0,
+    forte: true,
+    realce: true,
+    grupo: 'Passivo e patrimônio',
+    grupoTotal: { chaves: ['totalPassivo'], tipo: 'mi', grafico: 'totalPassivo' },
+  },
+  { chave: 'fornecedores', rotulo: 'Fornecedores', tipo: 'mi', nivel: 1 },
+  { chave: 'dividaCurto', rotulo: 'Dívida de curto prazo', tipo: 'mi', nivel: 1 },
+  { chave: 'passivoNaoCirc', rotulo: 'Passivo Não Circulante', tipo: 'mi', nivel: 0, forte: true, realce: true },
+  { chave: 'dividaLongo', rotulo: 'Dívida de longo prazo', tipo: 'mi', nivel: 1 },
+  { chave: 'patrimonio', rotulo: 'Patrimônio Líquido', tipo: 'mi', nivel: 0, forte: true, realce: true },
+  { chave: 'reservaLucros', rotulo: 'Reserva de lucros', tipo: 'mi', nivel: 1 },
+  { chave: 'tesouraria', rotulo: 'Ações em tesouraria', tipo: 'mi', nivel: 1 },
+
+  { chave: 'divida', rotulo: 'Dívida Bruta', tipo: 'mi', nivel: 1, grupo: 'Endividamento e capital' },
+  { chave: 'dividaLiquida', rotulo: 'Dívida Líquida', tipo: 'mi', nivel: 1 },
+  { chave: 'dlEbitda', rotulo: 'DL/EBITDA', tipo: 'x', nivel: 1 },
+  { chave: 'divEquity', rotulo: 'D/E', tipo: 'pct1', nivel: 1 },
+  { chave: 'cgol', rotulo: 'Capital de giro operacional', tipo: 'mi', nivel: 1 },
+  { chave: 'capInvestido', rotulo: 'Capital investido', tipo: 'mi', nivel: 1 },
+  { chave: 'roe', rotulo: 'ROE', tipo: 'pct1', nivel: 1 },
+
+  // só para o gráfico das faixas: o valor já aparece nelas
+  { chave: 'totalAtivo', rotulo: 'Total do Ativo', tipo: 'mi', oculta: true },
+  { chave: 'totalPassivo', rotulo: 'Total do Passivo', tipo: 'mi', oculta: true },
+];
+
 const ABAS = [
   { id: 'kpi', rotulo: 'Indicadores', colunas: COLUNAS_KPI },
   { id: 'eva', rotulo: 'EVA', colunas: COLUNAS_EVA },
   { id: 'fund', rotulo: 'Fundamentalistas', colunas: COLUNAS_FUND, layout: 'transposta' },
   { id: 'dre', rotulo: 'DRE Resumida', colunas: COLUNAS_DRE, layout: 'transposta' },
+  { id: 'bal', rotulo: 'Balanço Resumido', colunas: COLUNAS_BALANCO, layout: 'transposta' },
 ];
 
 const MS_ANO = 365.25 * 24 * 60 * 60 * 1000;
