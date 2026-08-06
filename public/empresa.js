@@ -228,9 +228,11 @@ const COLUNAS_DRE = [
   { chave: 'despJurosPct', rotulo: 'Despesas com juros %', tipo: 'pct1', nivel: 1 },
   // wb_perc_despesas_juros divide pelo ebit_ajustado, não pelo EBIT da faixa acima
   { chave: 'jurosSobreEbit', rotulo: 'Juros / EBIT ajustado', tipo: 'pct1', nivel: 1 },
-  { chave: 'ebt', rotulo: 'EBT', tipo: 'mi', nivel: 0, forte: true, grupo: 'Impostos e lucro líquido' },
+  // EBT fecha o que veio antes (operacional menos financeiro) em vez de abrir o bloco de
+  // impostos, então sai da seção e vira linha realçada, como Receita Líquida e Lucro Bruto.
+  { chave: 'ebt', rotulo: 'EBT', tipo: 'mi', nivel: 0, forte: true, realce: true },
   { chave: 'margemEbt', rotulo: 'Margem EBT', tipo: 'pct1', nivel: 1 },
-  { chave: 'impostos', rotulo: 'Impostos', tipo: 'mi', nivel: 1 },
+  { chave: 'impostos', rotulo: 'Impostos', tipo: 'mi', nivel: 1, grupo: 'Impostos e lucro líquido' },
   { chave: 'impostosPct', rotulo: 'Impostos %', tipo: 'pct1', nivel: 1 },
   { chave: 'lucro', rotulo: 'Lucro Líquido', tipo: 'mi', nivel: 0, forte: true },
   { chave: 'margemLiquida', rotulo: 'Margem líquida', tipo: 'pct1', nivel: 1 },
