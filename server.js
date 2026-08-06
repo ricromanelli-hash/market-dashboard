@@ -1674,21 +1674,27 @@ async function carregaIndicadores(ticker) {
 
 async function refreshSlowData() {
   // O CSV do Tesouro alimenta o IPCA+ 2032 e o 10 anos nominal do Brasil, que
-  // refreshRealRates consome — por isso roda antes.
-  const tesouro = await Promise.allSettled([refreshTesouroIpca2032()]);
-  const jobs = await Promise.allSettled([
-    refreshIpca(),
-    refreshCpi(),
+  // refreshRealRates consome. Só essa cadeia depende dele, então ele parte junto com os
+  // demais em vez de ser aguardado antes: são 14 MB, e esperá-lo atrasava em ~12s até o
+  // histórico de 12 meses, que não tem nada a ver com o Tesouro. Depois de um restart
+  // isso é o que mais pesa — o painel fica sem sparkline até o ciclo inteiro terminar.
+  const tesouro = refreshTesouroIpca2032();
+  const jurosReais = (async () => {
     // PIB e desemprego alimentam a tabela de juros reais, então vêm antes dela.
     // Falhas neles não impedem a tabela: as colunas só ficam vazias.
-    (async () => {
-      const erros = [];
-      for (const job of [refreshGdp, refreshUnemployment]) {
-        try { await job(); } catch (e) { erros.push(e.message); }
-      }
-      await refreshRealRates();
-      if (erros.length) throw new Error(erros.join(' | '));
-    })(),
+    const erros = [];
+    for (const job of [refreshGdp, refreshUnemployment]) {
+      try { await job(); } catch (e) { erros.push(e.message); }
+    }
+    await tesouro.catch(() => {}); // sem o CSV a tabela sai com colunas vazias, mas sai
+    await refreshRealRates();
+    if (erros.length) throw new Error(erros.join(' | '));
+  })();
+  const jobs = await Promise.allSettled([
+    tesouro,
+    refreshIpca(),
+    refreshCpi(),
+    jurosReais,
     refreshDiFutures(),
     refreshFearGreed(),
     refreshClima(),
@@ -1702,7 +1708,7 @@ async function refreshSlowData() {
   // diz qual das doze fontes caiu, e várias usam a mesma mensagem de timeout.
   const nomes = ['Tesouro', 'IPCA', 'CPI', 'Juros reais', 'DI futuro', 'Fear & Greed',
     'Clima', 'Histórico 12m', 'Notícias', 'Notícias macro', 'Notícias empresas', 'Calendário'];
-  cache.errors = [...tesouro, ...jobs]
+  cache.errors = jobs
     .map((r, i) => ({ nome: nomes[i] || `Job ${i}`, r }))
     .filter(({ r }) => r.status === 'rejected')
     .map(({ nome, r }) => `${nome}: ${r.reason.message}`);
