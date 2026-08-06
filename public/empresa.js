@@ -429,11 +429,13 @@ const COLUNAS_DFC = [
   { chave: 'deltaDivida', rotulo: 'Dívida (+/−)', tipo: 'mi', nivel: 1 },
   { chave: 'wfFcfeCore', rotulo: 'FCFE · core', tipo: 'mi', nivel: 0, forte: true, realce: true },
   { chave: 'wfDividendos', rotulo: 'Dividendos', tipo: 'mi', nivel: 1 },
+  // repete o total da faixa fechando a cascata, como no modelo: a faixa dá o número de
+  // relance lá em cima, e esta linha mostra de onde ele saiu
+  { chave: 'wfGeracao', rotulo: 'Geração de caixa', tipo: 'mi', nivel: 0, forte: true, realce: true },
 
   // só para o gráfico das faixas
   { chave: 'varCaixa', rotulo: 'Variação de caixa', tipo: 'mi', oculta: true },
   { chave: 'fcl', rotulo: 'Fluxo de caixa livre (FCL)', tipo: 'mi', oculta: true },
-  { chave: 'wfGeracao', rotulo: 'Geração de caixa', tipo: 'mi', oculta: true },
 ];
 
 const ABAS = [
