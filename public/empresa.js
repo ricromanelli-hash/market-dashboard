@@ -447,7 +447,7 @@ const ABAS = [
   { id: 'dfc', rotulo: 'DFC Resumido', colunas: COLUNAS_DFC, layout: 'transposta' },
   // As contas vêm do próprio layout da CVM e mudam de empresa para empresa, então esta
   // aba monta as colunas depois de buscar os dados, na primeira vez que é aberta.
-  { id: 'dredet', rotulo: 'DRE Detalhada', colunas: [], layout: 'transposta', dinamica: true },
+  { id: 'dfs', rotulo: 'DFs CVM', colunas: [], layout: 'transposta', dinamica: true },
 ];
 
 const MS_ANO = 365.25 * 24 * 60 * 60 * 1000;
@@ -1234,37 +1234,73 @@ function renderAbas() {
 // Busca as contas da CVM e as transforma em colunas desta aba, escrevendo os valores nas
 // linhas que já existem — assim a tabela transposta e o gráfico funcionam sem saber que
 // esta aba é diferente das outras.
+// Transforma um grupo da CVM (BP Ativo, DRE, DFC…) nas colunas da aba, escrevendo os
+// valores nas linhas que já existem — assim a tabela transposta e o gráfico funcionam sem
+// saber que esta aba é diferente. A chave leva o índice do grupo porque o mesmo código de
+// conta ("1.01") existe em demonstrações diferentes com significados distintos.
+function aplicaGrupoCvm(aba, indice) {
+  const g = aba.dados.grupos[indice];
+  if (!g) return;
+  aba.grupoAtivo = indice;
+  const chaveDe = (cd) => `cvm${indice}_${cd.replace(/\./g, '_')}`;
+  aba.colunas = g.contas.map((c) => ({
+    chave: chaveDe(c.cd),
+    rotulo: `${c.cd} · ${c.ds}`,
+    tipo: 'mi',
+    nivel: Math.min(c.nivel - 1, 2), // 3.01 na margem, 3.04.06.01 recuado duas vezes
+    forte: c.nivel === 1,
+  }));
+  // casa pelo ano; a linha do TTM é trimestral e não tem correspondente anual na CVM
+  DADOS.linhas.forEach((linha) => {
+    g.contas.forEach((c) => {
+      const v = c.valores[String(linha.ano)];
+      linha[chaveDe(c.cd)] = typeof v === 'number' ? v : null;
+    });
+  });
+}
+
 async function carregaAbaDinamica(aba) {
   if (aba.carregada) return;
-  conteudoEl.innerHTML = '<p class="loading">Carregando a DRE detalhada…</p>';
+  conteudoEl.innerHTML = '<p class="loading">Carregando as demonstrações da CVM…</p>';
   aba.carregada = true;
   try {
-    const res = await fetch(`/api/dre/${TICKER}`, { cache: 'no-store' });
+    const res = await fetch(`/api/dfs/${TICKER}`, { cache: 'no-store' });
     const dados = await res.json();
     if (!res.ok) throw new Error(dados.error || `HTTP ${res.status}`);
-    if (dados.vazio || !dados.contas.length) {
-      aba.erro = 'Esta empresa não tem DRE detalhada publicada na base da CVM.';
+    if (dados.vazio || !dados.grupos.length) {
+      aba.erro = 'Esta empresa não tem demonstrações na base da CVM.';
       return;
     }
-    const chaveDe = (cd) => `cvm${cd.replace(/\./g, '_')}`;
-    aba.colunas = dados.contas.map((c) => ({
-      chave: chaveDe(c.cd),
-      rotulo: `${c.cd} · ${c.ds}`,
-      tipo: 'mi',
-      nivel: Math.min(c.nivel - 1, 2), // 3.01 na margem, 3.04.06.01 recuado duas vezes
-      forte: c.nivel === 1,
-    }));
-    // casa pelo ano; a linha do TTM é trimestral e não tem correspondente anual na CVM
-    DADOS.linhas.forEach((linha) => {
-      dados.contas.forEach((c) => {
-        const v = c.valores[String(linha.ano)];
-        linha[chaveDe(c.cd)] = typeof v === 'number' ? v : null;
-      });
-    });
-    aba.origem = dados.origem;
+    aba.dados = dados;
+    aplicaGrupoCvm(aba, 0); // o servidor já devolve na ordem: consolidado, BP, DRE, DFC
   } catch (err) {
     aba.erro = err.message;
   }
+}
+
+// Seletor de demonstração, dentro da aba: trocar não refaz a busca, porque o servidor
+// mandou todos os grupos de uma vez.
+function renderSeletorCvm() {
+  const aba = ABA;
+  if (!aba.dinamica || !aba.dados) {
+    controlesEl.innerHTML = '';
+    controlesEl.hidden = true;
+    return;
+  }
+  const opcoes = aba.dados.grupos
+    .map((g, i) => `<option value="${i}"${i === aba.grupoAtivo ? ' selected' : ''}>${esc(`${g.nome} · ${g.escopo}`)}</option>`)
+    .join('');
+  controlesEl.innerHTML = `<label class="emp-ctrl">Demonstração
+      <select id="empGrupoCvm">${opcoes}</select>
+    </label>
+    <span class="emp-dica">direto do arquivo da CVM · ${esc(aba.dados.unidade)}</span>`;
+  controlesEl.hidden = false;
+  document.getElementById('empGrupoCvm').addEventListener('change', (ev) => {
+    fechaGrafico();
+    grafico.series = [];
+    aplicaGrupoCvm(aba, Number(ev.target.value));
+    conteudoEl.innerHTML = renderTabela(DADOS);
+  });
 }
 
 // Só a tabela: quem chama decide o que fazer com o gráfico aberto — trocar de aba pelo
@@ -1281,8 +1317,10 @@ function trocaAba(nova) {
   atualizaVariacao();
   renderGaleria(); // a barra é filtrada pela aba
   // De/Até e o rodapé de variação pressupõem períodos em linhas: na tabela transposta
-  // o período é a coluna, e arrastar ou marcar duas pontas não teria o mesmo sentido
+  // o período é a coluna, e arrastar ou marcar duas pontas não teria o mesmo sentido.
+  // A aba da CVM aproveita a mesma barra para o seletor de demonstração.
   controlesEl.hidden = Boolean(ABA.layout);
+  if (ABA.dinamica) renderSeletorCvm();
 }
 
 // ---- Galeria de gráficos ----

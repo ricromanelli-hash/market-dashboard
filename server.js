@@ -1839,66 +1839,94 @@ app.get('/api/data', (req, res) => {
   res.json({ ...cache, version: VERSION });
 });
 
-// ---- DRE detalhada, direto do layout da CVM (cvm_dfanual) ----
-// Aqui o conjunto de contas não é fixo: varia de empresa para empresa e até de ano para
-// ano dentro da mesma empresa, então as linhas da tabela saem dos próprios dados.
-const DRE_CACHE_MS = 60 * 60 * 1000;
-const dreCache = new Map();
+// ---- Demonstrações da CVM, direto do layout do arquivo (cvm_dfanual) ----
+// Balanço (ativo e passivo), DRE e fluxo de caixa, em consolidado e individual. O
+// conjunto de contas não é fixo: varia de empresa para empresa e até de ano para ano
+// dentro da mesma empresa, então as linhas da tabela saem dos próprios dados.
+const DFS_CACHE_MS = 60 * 60 * 1000;
+const dfsCache = new Map();
 
-async function carregaDreDetalhada(ticker) {
+// "DF Consolidado - Balanço Patrimonial Ativo" -> escopo e nome curto para o seletor
+function parteGrupo(grupo) {
+  const consolidado = grupo.startsWith('DF Consolidado');
+  const nome = grupo.replace(/^DF (Consolidado|Individual) - /, '')
+    .replace('Demonstração do Resultado', 'DRE')
+    .replace('Demonstração do Fluxo de Caixa', 'DFC')
+    .replace('Balanço Patrimonial', 'BP');
+  return { escopo: consolidado ? 'Consolidado' : 'Individual', nome };
+}
+
+async function carregaDfsCvm(ticker) {
   const papeis = await supabaseSelect('ac_ticker', `select=cd_cvm,nome_curto&ticker=eq.${ticker}&limit=1`);
   if (!papeis.length) throw new Error(`Ticker ${ticker} não encontrado`);
   const cvm = papeis[0].cd_cvm;
 
-  const campos = 'CD_CONTA,DS_CONTA,DT_FIM_EXERC,VL_CONTA,ESCALA_MOEDA,DENOM_CIA';
-  const busca = (grupo) => supabaseSelect(
-    'cvm_dfanual',
-    `select=${campos}&CD_CVM=eq.${cvm}&GRUPO_DFP=eq.${encodeURIComponent(grupo)}`
-      + '&ORDEM_EXERC=eq.%C3%9ALTIMO&order=DT_FIM_EXERC.desc&limit=4000',
-  );
-  // Consolidado é o que interessa em holding; quem não publica consolidado cai no individual.
-  let bruto = await busca('DF Consolidado - Demonstração do Resultado');
-  let origem = 'consolidado';
-  if (!bruto.length) {
-    bruto = await busca('DF Individual - Demonstração do Resultado');
-    origem = 'individual';
+  // Uma consulta só, com todas as demonstrações: são ~2.500 linhas por empresa, e assim
+  // trocar de demonstração na tela não custa ida ao servidor.
+  // O PostgREST corta a resposta em 1.000 linhas, e uma empresa tem ~2.500 nesta tabela:
+  // sem paginar, voltavam só os 3 ou 4 exercícios mais recentes, calados. A ordem é
+  // estável (data, grupo, conta) para o offset não pular nem repetir linha.
+  const PAGINA = 1000;
+  const bruto = [];
+  for (let offset = 0; offset < 20000; offset += PAGINA) {
+    // eslint-disable-next-line no-await-in-loop
+    const pagina = await supabaseSelect(
+      'cvm_dfanual',
+      'select=CD_CONTA,DS_CONTA,DT_FIM_EXERC,VL_CONTA,ESCALA_MOEDA,DENOM_CIA,GRUPO_DFP'
+        + `&CD_CVM=eq.${cvm}&ORDEM_EXERC=eq.%C3%9ALTIMO`
+        + `&order=DT_FIM_EXERC.desc,GRUPO_DFP.asc,CD_CONTA.asc&limit=${PAGINA}&offset=${offset}`,
+    );
+    bruto.push(...pagina);
+    if (pagina.length < PAGINA) break;
   }
-  if (!bruto.length) return { ticker, cvm, vazio: true, contas: [], anos: [] };
+  if (!bruto.length) return { ticker, cvm, vazio: true, grupos: [] };
 
-  const anos = [...new Set(bruto.map((r) => String(r.DT_FIM_EXERC).slice(0, 4)))]
-    .sort((a, b) => Number(b) - Number(a));
-  const porConta = new Map();
+  const porGrupo = new Map();
   for (const r of bruto) {
+    if (!porGrupo.has(r.GRUPO_DFP)) porGrupo.set(r.GRUPO_DFP, { contas: new Map(), anos: new Set() });
+    const g = porGrupo.get(r.GRUPO_DFP);
+    const ano = String(r.DT_FIM_EXERC).slice(0, 4);
+    g.anos.add(ano);
     const cd = r.CD_CONTA;
-    if (!porConta.has(cd)) {
-      porConta.set(cd, { cd, ds: r.DS_CONTA, nivel: (cd.match(/\./g) || []).length, valores: {} });
+    if (!g.contas.has(cd)) {
+      g.contas.set(cd, { cd, ds: r.DS_CONTA, nivel: (cd.match(/\./g) || []).length, valores: {} });
     }
-    // a CVM publica esta demonstração em MIL; o painel inteiro fala em milhões
+    // a CVM publica estes arquivos em MIL; o painel inteiro fala em milhões
     const escala = r.ESCALA_MOEDA === 'UNIDADE' ? 1e6 : 1e3;
     const v = num(r.VL_CONTA);
-    porConta.get(cd).valores[String(r.DT_FIM_EXERC).slice(0, 4)] = v === null ? null : +(v / escala).toFixed(0);
+    g.contas.get(cd).valores[ano] = v === null ? null : +(v / escala).toFixed(0);
   }
-  // "3.01" < "3.02" < "3.10": os códigos vêm com dois dígitos, então a ordem alfabética
-  // já é a ordem da demonstração
-  const contas = [...porConta.values()].sort((a, b) => a.cd.localeCompare(b.cd));
+
+  const grupos = [...porGrupo.entries()].map(([grupo, g]) => ({
+    grupo,
+    ...parteGrupo(grupo),
+    anos: [...g.anos].sort((a, b) => Number(b) - Number(a)),
+    // "3.01" < "3.02" < "3.10": os códigos vêm com dois dígitos, então a ordem
+    // alfabética já é a ordem da demonstração
+    contas: [...g.contas.values()].sort((a, b) => a.cd.localeCompare(b.cd)),
+  }));
+  // consolidado antes do individual, e dentro de cada escopo na ordem BP, DRE, DFC
+  const ordem = ['BP Ativo', 'BP Passivo', 'DRE', 'DFC (Método Indireto)', 'DFC (Método Direto)'];
+  grupos.sort((a, b) => (a.escopo === b.escopo
+    ? ordem.indexOf(a.nome) - ordem.indexOf(b.nome)
+    : a.escopo.localeCompare(b.escopo)));
+
   return {
     ticker,
     cvm,
     empresa: bruto[0].DENOM_CIA || papeis[0].nome_curto,
-    origem,
     unidade: 'R$ milhões',
-    anos,
-    contas,
+    grupos,
   };
 }
 
-app.get('/api/dre/:ticker', async (req, res) => {
+app.get('/api/dfs/:ticker', async (req, res) => {
   const ticker = String(req.params.ticker || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
-  const emCache = dreCache.get(ticker);
-  if (emCache && Date.now() - emCache.quando < DRE_CACHE_MS) return res.json(emCache.dados);
+  const emCache = dfsCache.get(ticker);
+  if (emCache && Date.now() - emCache.quando < DFS_CACHE_MS) return res.json(emCache.dados);
   try {
-    const dados = await carregaDreDetalhada(ticker);
-    dreCache.set(ticker, { quando: Date.now(), dados });
+    const dados = await carregaDfsCvm(ticker);
+    dfsCache.set(ticker, { quando: Date.now(), dados });
     return res.json(dados);
   } catch (err) {
     return res.status(502).json({ error: err.message, ticker });
