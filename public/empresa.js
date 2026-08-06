@@ -492,9 +492,10 @@ function ligaArrasto() {
 
 // ---- Histórico do indicador: clique no cabeçalho da coluna ----
 
-// `ignorar` começa ligado porque um único exercício atípico (P/L num ano de prejuízo,
-// margem sobre base quase zero) estica a escala e achata todo o resto do gráfico.
-const grafico = { coluna: null, series: [], tipo: 'barra', ignorar: true, anos: 'tudo' };
+// `ignorar` começa desligado: o gráfico abre mostrando a série inteira, e esconder
+// período é decisão de quem olha. O filtro continua a um clique, para quando um
+// exercício atípico esticar a escala e achatar todo o resto.
+const grafico = { coluna: null, series: [], tipo: 'barra', ignorar: false, anos: 'tudo' };
 
 const JANELAS = [5, 10, 15];
 
@@ -788,11 +789,16 @@ function renderModal() {
   const valores = dados.mostrados.map((p) => p.valor);
   const ordenados = [...valores].sort((a, b) => a - b);
   const atual = dados.todos.length ? dados.todos[dados.todos.length - 1].valor : null;
-  let nota = 'Nenhum período fora do intervalo esperado.';
+  let nota;
   if (dados.ocultos) {
     nota = `${dados.ocultos} período${dados.ocultos > 1 ? 's' : ''} fora do intervalo de Tukey (Q1−1,5·IQR a Q3+1,5·IQR) — desmarque acima para ver.`;
-  } else if (grafico.ignorar && dados.serieCheia.length < 5) {
+  } else if (!grafico.ignorar) {
+    // sem o filtro ligado nada foi avaliado: dizer que não há anomalia seria mentira
+    nota = 'Série completa. Marque "Ignorar anomalias" para esconder períodos fora do intervalo de Tukey.';
+  } else if (dados.serieCheia.length < 5) {
     nota = 'Períodos de menos para avaliar anomalias — o filtro precisa de pelo menos 5.';
+  } else {
+    nota = 'Nenhum período fora do intervalo esperado.';
   }
 
   // Séries que dividem o mesmo eixo precisam da mesma unidade: somar (ou comparar altura
@@ -1025,7 +1031,7 @@ const MODELOS = [
   },
   { aba: 'eva', nome: 'Valor de Mercado × Spread', chaves: ['valorMercado', 'spread'], tipo: 'linha' },
   { aba: 'eva', nome: 'EVA', chaves: ['eva'], tipo: 'barra' },
-].map((m) => ({ anos: 'tudo', ignorar: true, ...m })); // janela e filtro padrão, se o modelo não disser outra coisa
+].map((m) => ({ anos: 'tudo', ignorar: false, ...m })); // janela e filtro padrão, se o modelo não disser outra coisa
 
 const FAVS_CHAVE = 'market-dashboard:graficos-favoritos';
 
