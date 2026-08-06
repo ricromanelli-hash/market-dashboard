@@ -178,12 +178,13 @@ const COLUNAS_FUND = [
 const COLUNAS_DRE = [
   { chave: 'receita', rotulo: 'Receita Líquida', tipo: 'mi', nivel: 0, forte: true },
   { chave: 'cpv', rotulo: 'Custo produto/serviço vendido (−)', tipo: 'mi', nivel: 1 },
+  // sob o próprio CPV, como DVGA / Lucro Bruto fica sob a DVGA. O card do Apolo chama
+  // de "CPV/Lucro Bruto", mas wb_custo_cpv_perc bate exatamente com CPV/receita — é o
+  // complemento da margem bruta, não uma razão sobre o lucro bruto.
+  { chave: 'cpvSobreLb', rotulo: 'CPV / Receita', tipo: 'pct1', nivel: 1 },
   { chave: 'lucroBruto', rotulo: 'Lucro Bruto', tipo: 'mi', nivel: 0, forte: true },
   { chave: 'margemBruta', rotulo: 'Margem bruta', tipo: 'pct1', nivel: 1 },
   { chave: 'margemBruta10y', rotulo: 'Margem bruta · média 10 anos', tipo: 'pct1', nivel: 1 },
-  // o card do Apolo chama de "CPV/Lucro Bruto", mas wb_custo_cpv_perc bate exatamente
-  // com CPV/receita (é o complemento da margem bruta), não com CPV/lucro bruto
-  { chave: 'cpvSobreLb', rotulo: 'CPV / Receita', tipo: 'pct1', nivel: 1 },
   { chave: 'dvga', rotulo: 'D. Vendas/Gerais/Administrativas', tipo: 'mi', nivel: 1 },
   { chave: 'dvgaSobreLb', rotulo: 'DVGA / Lucro Bruto', tipo: 'pct1', nivel: 1 },
   { chave: 'eqPatr', rotulo: 'Equivalência Patrimonial', tipo: 'mi', nivel: 1 },
