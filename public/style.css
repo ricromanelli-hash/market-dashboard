@@ -1683,6 +1683,11 @@ body.emp-arrastando { user-select: none; }
 }
 .emp-tabela-fund tr.emp-grupo td.emp-num.neg { color: var(--red-down); }
 
+/* faixa que abre gráfico: só ela acende, para não sugerir clique nas outras */
+.emp-tabela-fund tr.emp-grupo-clicavel { cursor: pointer; }
+.emp-tabela-fund tr.emp-grupo-clicavel:hover td,
+.emp-tabela-fund tr.emp-grupo-clicavel:hover th.emp-grupo-rot { background: #c6d8ca; }
+
 /* o span acompanha a rolagem horizontal: sem isso o título some ao rolar para 2015 */
 .emp-tabela-fund tr.emp-grupo span {
   position: sticky;

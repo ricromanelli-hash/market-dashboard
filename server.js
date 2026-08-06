@@ -1650,6 +1650,11 @@ function linhaKpi(r) {
   // Se qualquer parcela faltar a soma seria menor do que o custo real, então vira nulo.
   const capm = [r.taxalivrederisco, r.erp, r.rbr, r.dif_inflacao].map(num);
   linha.keCapm = capm.every((v) => v !== null) ? pct(capm.reduce((s, v) => s + v, 0)) : null;
+  // Bloco de despesas operacionais da DRE: alimenta o total na faixa da seção e o
+  // gráfico dela. Líquido, porque a equivalência patrimonial entra positiva — fecha
+  // com EBIT − Lucro Bruto.
+  const oper = [r.dvga, r.eq_patr, r.outras_rd].map(num).filter((v) => v !== null);
+  linha.despesasOper = oper.length ? milhoes(oper.reduce((s, v) => s + v, 0)) : null;
   // D/E pela dívida bruta sobre o valor de mercado do equity (não sobre o PL contábil).
   // Market cap zerado estoura a divisão, então nesse caso a célula fica vazia.
   const equity = num(r.valordemercado);

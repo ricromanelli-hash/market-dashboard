@@ -193,14 +193,24 @@ const COLUNAS_DRE = [
     tipo: 'mi',
     nivel: 1,
     grupo: 'Despesas operacionais',
-    // soma exibida na própria faixa da seção; é líquida, porque a equivalência
-    // patrimonial entra positiva. Fecha com EBIT − Lucro Bruto.
-    grupoTotal: { chaves: ['dvga', 'eqPatr', 'outrasRd'], tipo: 'mi' },
+    // A faixa mostra o total do bloco e abre o gráfico dele. `despesasOper` vem somado
+    // do servidor: a soma das três parcelas aqui daria o mesmo número na tabela, mas o
+    // gráfico precisa de uma série própria para plotar.
+    grupoTotal: { chaves: ['despesasOper'], tipo: 'mi', grafico: 'despesasOper' },
   },
   { chave: 'dvgaSobreLb', rotulo: 'DVGA / Lucro Bruto', tipo: 'pct1', nivel: 1 },
   { chave: 'eqPatr', rotulo: 'Equivalência Patrimonial', tipo: 'mi', nivel: 1 },
   { chave: 'outrasRd', rotulo: 'Outras Despesas / Receitas', tipo: 'mi', nivel: 1 },
-  { chave: 'ebitda', rotulo: 'EBITDA', tipo: 'mi', nivel: 0, forte: true, grupo: 'Resultado operacional' },
+  {
+    chave: 'ebitda',
+    rotulo: 'EBITDA',
+    tipo: 'mi',
+    nivel: 0,
+    forte: true,
+    grupo: 'Resultado operacional/EBIT',
+    // uma parcela só: a faixa carrega o próprio EBIT, que é onde o bloco desemboca
+    grupoTotal: { chaves: ['ebit'], tipo: 'mi', grafico: 'ebit' },
+  },
   { chave: 'margemEbitda', rotulo: 'Margem EBITDA', tipo: 'pct1', nivel: 1 },
   { chave: 'da', rotulo: 'Depreciação / Amortização', tipo: 'mi', nivel: 1 },
   { chave: 'ebit', rotulo: 'EBIT', tipo: 'mi', nivel: 0, forte: true },
@@ -218,6 +228,9 @@ const COLUNAS_DRE = [
   { chave: 'lucro', rotulo: 'Lucro Líquido', tipo: 'mi', nivel: 0, forte: true },
   { chave: 'margemLiquida', rotulo: 'Margem líquida', tipo: 'pct1', nivel: 1 },
   { chave: 'lucro10y', rotulo: 'Lucro líquido · média 10 anos', tipo: 'mi', nivel: 1 },
+  // Não vira linha da tabela (o número já aparece na faixa da seção), mas existe como
+  // coluna para o gráfico da faixa e para a lista de "comparar com".
+  { chave: 'despesasOper', rotulo: 'Despesas operacionais (total)', tipo: 'mi', oculta: true },
 ];
 
 const ABAS = [
@@ -1209,12 +1222,19 @@ function renderTabelaTransposta(dados) {
           const soma = parcelas.reduce((s, v) => s + v, 0);
           return `<td class="emp-num${soma < 0 ? ' neg' : ''}">${formata(soma, c.grupoTotal.tipo)}</td>`;
         }).join('');
-        titulo = `<tr class="emp-grupo"><th scope="row" class="emp-grupo-rot">${esc(c.grupo)}</th>${somas}</tr>`;
+        // a faixa abre o gráfico da própria série que ela resume
+        const alvo = COLUNAS().findIndex((x) => x.chave === c.grupoTotal.grafico);
+        const clique = alvo >= 0
+          ? ` data-ind="${alvo}" class="emp-grupo emp-grupo-clicavel" title="ver histórico de ${esc(COLUNAS()[alvo].rotulo)}"`
+          : ' class="emp-grupo"';
+        titulo = `<tr${clique}><th scope="row" class="emp-grupo-rot">${esc(c.grupo)}</th>${somas}</tr>`;
       } else {
         // o span fixo mantém o título da seção à vista mesmo com a tabela rolada
         titulo = `<tr class="emp-grupo"><td colspan="${periodos.length + 1}"><span>${esc(c.grupo)}</span></td></tr>`;
       }
     }
+    // coluna oculta existe só para o gráfico da faixa: não vira linha da tabela
+    if (c.oculta) return titulo;
     const celulas = periodos.map((l) => {
       const valor = l[c.chave];
       const negativo = typeof valor === 'number' && valor < 0;
