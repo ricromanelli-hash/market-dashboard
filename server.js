@@ -421,7 +421,17 @@ async function fetchQuote(symbol, fromSeries = false) {
       if (prevClose != null) prevCloseCache.set(chave, prevClose);
     }
   }
-  const changePct = prevClose ? ((price - prevClose) / prevClose) * 100 : 0;
+  // Última linha de defesa: o `meta` traz o fechamento anterior à janela mesmo quando os
+  // closes da série vêm nulos. É o que salva o painel no Render, onde a série chega
+  // atrasada em uma sessão — sem dia anterior dentro da janela de 2 dias, não havia com
+  // o que comparar e a variação do dia saía zerada em todas as ações.
+  if (prevClose == null) {
+    const doMeta = meta.chartPreviousClose ?? meta.previousClose;
+    if (typeof doMeta === 'number') prevClose = doMeta;
+  }
+  // null, não zero: sem fechamento anterior a variação é desconhecida, e o painel já
+  // sabe mostrar "—" nesse caso. Zero afirmava "não mudou", que é outra coisa.
+  const changePct = prevClose ? ((price - prevClose) / prevClose) * 100 : null;
   return { price, changePct, currency: meta.currency ?? null };
 }
 
