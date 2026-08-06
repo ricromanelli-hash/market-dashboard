@@ -1296,7 +1296,10 @@ function aplicaGrupoCvm(aba, indice) {
   // de reaproveitar as linhas do endpoint de indicadores, que são sempre anuais.
   const chaveValor = (cd) => `cvm${indice}_${cd.replace(/\./g, '_')}`;
   aba.linhas = g.periodos.map((p) => {
-    const linha = { data: p.data, rotulo: p.rotulo, ano: Number(p.data.slice(0, 4)) };
+    // o 4T dos fluxos não vem da CVM: é o anual menos os trimestres publicados, e o
+    // asterisco no cabeçalho avisa que ali o número foi calculado
+    const rotulo = p.derivado ? `${p.rotulo}*` : p.rotulo;
+    const linha = { data: p.data, rotulo, ano: Number(p.data.slice(0, 4)) };
     g.contas.forEach((c) => {
       const v = c.valores[p.data];
       linha[chaveValor(c.cd)] = typeof v === 'number' ? v : null;

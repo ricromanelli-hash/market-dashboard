@@ -1879,18 +1879,23 @@ async function carregaDfsCvm(ticker, { tabela, trimestral }) {
   // sem paginar, voltavam só os 3 ou 4 exercícios mais recentes, calados. A ordem é
   // estável (data, grupo, conta) para o offset não pular nem repetir linha.
   const PAGINA = 1000;
-  const bruto = [];
-  for (let offset = 0; offset < 40000; offset += PAGINA) {
-    // eslint-disable-next-line no-await-in-loop
-    const pagina = await supabaseSelect(
-      tabela,
-      'select=CD_CONTA,DS_CONTA,DT_INI_EXERC,DT_FIM_EXERC,VL_CONTA,ESCALA_MOEDA,DENOM_CIA,GRUPO_DFP'
-        + `&CD_CVM=eq.${cvm}&ORDEM_EXERC=eq.%C3%9ALTIMO`
-        + `&order=DT_FIM_EXERC.desc,GRUPO_DFP.asc,CD_CONTA.asc&limit=${PAGINA}&offset=${offset}`,
-    );
-    bruto.push(...pagina);
-    if (pagina.length < PAGINA) break;
-  }
+  const buscaTudo = async (alvo) => {
+    const linhas = [];
+    for (let offset = 0; offset < 40000; offset += PAGINA) {
+      // eslint-disable-next-line no-await-in-loop
+      const pagina = await supabaseSelect(
+        alvo,
+        'select=CD_CONTA,DS_CONTA,DT_INI_EXERC,DT_FIM_EXERC,VL_CONTA,ESCALA_MOEDA,DENOM_CIA,GRUPO_DFP'
+          + `&CD_CVM=eq.${cvm}&ORDEM_EXERC=eq.%C3%9ALTIMO`
+          + `&order=DT_FIM_EXERC.desc,GRUPO_DFP.asc,CD_CONTA.asc&limit=${PAGINA}&offset=${offset}`,
+      );
+      linhas.push(...pagina);
+      if (pagina.length < PAGINA) break;
+    }
+    return linhas;
+  };
+
+  const bruto = await buscaTudo(tabela);
   if (!bruto.length) return { ticker, cvm, vazio: true, grupos: [] };
 
   // No ITR cada data de fechamento aparece duas vezes na DRE: o acumulado do ano
@@ -1912,8 +1917,14 @@ async function carregaDfsCvm(ticker, { tabela, trimestral }) {
     // duas metades do balanço numa entrada só do seletor
     const { escopo, nome } = parteGrupo(r.GRUPO_DFP);
     const chave = `${escopo}|${nome}`;
-    if (!porGrupo.has(chave)) porGrupo.set(chave, { escopo, nome, contas: new Map(), periodos: new Map() });
+    if (!porGrupo.has(chave)) {
+      porGrupo.set(chave, { escopo, nome, contas: new Map(), periodos: new Map(), duracoes: new Map() });
+    }
     const g = porGrupo.get(chave);
+    // Duração por data, não um máximo do grupo inteiro: basta uma conta de um ano ter só
+    // a variante acumulada para o máximo estourar e a demonstração inteira ser tratada
+    // como acumulada — foi o que fez a DRE derivar o 4T subtraindo só o terceiro trimestre.
+    g.duracoes.set(String(r.DT_FIM_EXERC), duracao(r));
     const data = String(r.DT_FIM_EXERC);
     g.periodos.set(data, trimestral ? rotuloTrimestre(data) : data.slice(0, 4));
     const cd = r.CD_CONTA;
@@ -1926,10 +1937,75 @@ async function carregaDfsCvm(ticker, { tabela, trimestral }) {
     g.contas.get(cd).valores[data] = v === null ? null : +(v / escala).toFixed(0);
   }
 
+  // ---- 4T: a CVM só publica ITR nos três primeiros trimestres ----
+  // O quarto sai do anual, e como se chega nele depende da natureza da demonstração:
+  //   posição (balanço)  -> é o próprio saldo de 31/12, sem conta nenhuma
+  //   isolado (DRE)      -> anual menos a soma dos três trimestres
+  //   acumulado (DFC)    -> anual menos o acumulado até o 3T
+  if (trimestral) {
+    const anual = await buscaTudo('cvm_dfanual');
+    const porAno = new Map(); // "escopo|nome" -> conta -> ano -> valor
+    for (const r of anual) {
+      const { escopo, nome } = parteGrupo(r.GRUPO_DFP);
+      const chave = `${escopo}|${nome}`;
+      if (!porAno.has(chave)) porAno.set(chave, new Map());
+      const contas = porAno.get(chave);
+      if (!contas.has(r.CD_CONTA)) contas.set(r.CD_CONTA, new Map());
+      const escala = r.ESCALA_MOEDA === 'UNIDADE' ? 1e6 : 1e3;
+      const v = num(r.VL_CONTA);
+      contas.get(r.CD_CONTA).set(
+        String(r.DT_FIM_EXERC).slice(0, 4),
+        v === null ? null : +(v / escala).toFixed(0),
+      );
+    }
+
+    for (const [chave, g] of porGrupo.entries()) {
+      const doAnual = porAno.get(chave);
+      if (!doAnual) continue;
+      const posicao = [...g.duracoes.values()].every((d) => d === 0);
+      const anos = [...new Set([...g.periodos.keys()].map((d) => d.slice(0, 4)))];
+      for (const ano of anos) {
+        const fim = `${ano}-12-31`;
+        if (g.periodos.has(fim)) continue; // já veio do ITR, nada a derivar
+        // o regime é do ano: o 3T dele é acumulado (DFC) ou é o trimestre solto (DRE)?
+        const dur3T = g.duracoes.get(`${ano}-09-30`);
+        const acumulado = typeof dur3T === 'number' && dur3T > 100;
+        let algum = false;
+        for (const [cd, conta] of g.contas.entries()) {
+          const doAno = doAnual.get(cd);
+          const cheio = doAno ? doAno.get(ano) : undefined;
+          if (typeof cheio !== 'number') continue;
+          let valor = null;
+          if (posicao) {
+            valor = cheio;
+          } else if (acumulado) {
+            const ate3T = conta.valores[`${ano}-09-30`];
+            if (typeof ate3T === 'number') valor = +(cheio - ate3T).toFixed(0);
+          } else {
+            const tri = [`${ano}-03-31`, `${ano}-06-30`, `${ano}-09-30`].map((d) => conta.valores[d]);
+            // sem os três trimestres a diferença não seria o 4T, seria um resto qualquer
+            if (tri.every((v) => typeof v === 'number')) {
+              valor = +(cheio - tri.reduce((s, v) => s + v, 0)).toFixed(0);
+            }
+          }
+          if (valor !== null) {
+            conta.valores[fim] = valor;
+            algum = true;
+          }
+        }
+        if (algum) {
+          g.periodos.set(fim, rotuloTrimestre(fim));
+          if (!posicao) g.derivados = [...(g.derivados || []), fim];
+        }
+      }
+    }
+  }
+
   const grupos = [...porGrupo.values()].map((g) => {
     // do mais antigo para o mais recente; a tabela inverte na hora de desenhar
+    const derivados = new Set(g.derivados || []);
     let periodos = [...g.periodos.entries()]
-      .map(([data, rotulo]) => ({ data, rotulo }))
+      .map(([data, rotulo]) => ({ data, rotulo, derivado: derivados.has(data) }))
       .sort((a, b) => a.data.localeCompare(b.data));
     if (trimestral && periodos.length > TRIMESTRES_EXIBIDOS) {
       periodos = periodos.slice(-TRIMESTRES_EXIBIDOS);
