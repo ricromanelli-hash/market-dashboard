@@ -1671,6 +1671,21 @@ function linhaKpi(r) {
   // Se qualquer parcela faltar a soma seria menor do que o custo real, então vira nulo.
   const capm = [r.taxalivrederisco, r.erp, r.rbr, r.dif_inflacao].map(num);
   linha.keCapm = capm.every((v) => v !== null) ? pct(capm.reduce((s, v) => s + v, 0)) : null;
+  // DuPont de 5 etapas: ROE = (LL/EBT) × (EBT/EBIT) × (EBIT/Receita) × (Receita/Ativo) ×
+  // (Ativo/PL). Sai dos valores crus, não dos já arredondados para milhões, senão o
+  // produto dos cinco fatores não reconcilia com a coluna de ROE.
+  const div = (a, b) => {
+    const x = num(a);
+    const y = num(b);
+    return x === null || y === null || y === 0 ? null : x / y;
+  };
+  linha.dpCarga = decimal(div(r.lucro_liquido, r.ebt));
+  linha.dpJuros = decimal(div(r.ebt, r.ebit));
+  linha.dpMargem = pct(div(r.ebit, r.receita_liquida));
+  linha.dpGiro = decimal(div(r.receita_liquida, r.total_ativo));
+  // com patrimônio negativo o multiplicador inverte de sinal e deixa de significar
+  // alavancagem, então não se mostra número nenhum
+  linha.dpAlavanca = num(r.plcontabil) > 0 ? decimal(div(r.total_ativo, r.plcontabil)) : null;
   // Bloco de despesas operacionais da DRE: alimenta o total na faixa da seção e o
   // gráfico dela. Líquido, porque a equivalência patrimonial entra positiva — fecha
   // com EBIT − Lucro Bruto.

@@ -294,11 +294,27 @@ const COLUNAS_BALANCO = [
   { chave: 'divEquity', rotulo: 'D/E', tipo: 'pct1', nivel: 1 },
   { chave: 'cgol', rotulo: 'Capital de giro operacional', tipo: 'mi', nivel: 1 },
   { chave: 'capInvestido', rotulo: 'Capital investido', tipo: 'mi', nivel: 1 },
-  { chave: 'roe', rotulo: 'ROE', tipo: 'pct1', nivel: 1 },
+
+  // DuPont de 5 etapas: os cinco fatores multiplicados devolvem o ROE, que fica na faixa.
+  // Os três primeiros vêm da DRE (quanto sobra de cada etapa do resultado), o quarto mede
+  // a eficiência do ativo e o quinto, a alavancagem — é aí que o balanço entra.
+  {
+    chave: 'dpCarga',
+    rotulo: 'Carga tributária · LL / EBT',
+    tipo: 'dec',
+    nivel: 1,
+    grupo: 'DuPont · decomposição do ROE',
+    grupoTotal: { chaves: ['roe'], tipo: 'pct1', grafico: 'roe' },
+  },
+  { chave: 'dpJuros', rotulo: 'Efeito juros · EBT / EBIT', tipo: 'dec', nivel: 1 },
+  { chave: 'dpMargem', rotulo: 'Margem operacional · EBIT / Receita', tipo: 'pct1', nivel: 1 },
+  { chave: 'dpGiro', rotulo: 'Giro do ativo · Receita / Ativo', tipo: 'dec', nivel: 1 },
+  { chave: 'dpAlavanca', rotulo: 'Alavancagem · Ativo / PL', tipo: 'dec', nivel: 1 },
 
   // só para o gráfico das faixas: o valor já aparece nelas
   { chave: 'totalAtivo', rotulo: 'Total do Ativo', tipo: 'mi', oculta: true },
   { chave: 'totalPassivo', rotulo: 'Total do Passivo', tipo: 'mi', oculta: true },
+  { chave: 'roe', rotulo: 'ROE', tipo: 'pct1', oculta: true },
 ];
 
 const ABAS = [
