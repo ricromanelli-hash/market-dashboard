@@ -1194,6 +1194,8 @@ body.tv-mode a.row-stock:hover { background: none; }
   border-bottom: 1px solid var(--border);
   font-size: 12.5px;
 }
+/* `display: flex` acima vence o `hidden` do navegador, que só define display: none */
+.emp-controles[hidden] { display: none; }
 
 .emp-ctrl {
   display: inline-flex;
@@ -1614,6 +1616,49 @@ body.emp-arrastando { user-select: none; }
   font-size: 12px;
   font-weight: 700;
   text-anchor: start;
+}
+
+/* ---- Aba fundamentalista: anos em colunas, indicadores em linhas ---- */
+.emp-tabela-fund tbody tr:nth-child(even) td { background: transparent; }
+.emp-tabela-fund tbody td { border-bottom: 1px solid #f0f2ef; }
+
+.emp-tabela-fund th.emp-ind,
+.emp-tabela-fund th.emp-ind-cabeca {
+  position: sticky;
+  left: 0;
+  text-align: left;
+  white-space: nowrap;
+  min-width: 168px;
+}
+.emp-tabela-fund th.emp-ind {
+  background: var(--card-bg);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 12px;
+  padding: 6px 12px 6px 18px; /* recuo: o título da seção fica alinhado à esquerda */
+  border-bottom: 1px solid #f0f2ef;
+  z-index: 1;
+}
+.emp-tabela-fund th.emp-ind:hover { background: #eef4ef; }
+.emp-tabela-fund th.emp-ind-cabeca { z-index: 3; }
+
+.emp-tabela-fund tr.emp-grupo td {
+  background: #eef4ef;
+  border-bottom: 1px solid var(--border);
+  border-top: 1px solid var(--border);
+  padding: 0;
+}
+/* o span acompanha a rolagem horizontal: sem isso o título some ao rolar para 2015 */
+.emp-tabela-fund tr.emp-grupo span {
+  position: sticky;
+  left: 0;
+  display: inline-block;
+  padding: 6px 14px;
+  color: var(--green-header);
+  font-weight: 700;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .emp-aviso {

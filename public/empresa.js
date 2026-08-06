@@ -131,9 +131,51 @@ const COLUNAS_EVA = [
   { chave: 'cotacaoPn', rotulo: 'Cotação PN', tipo: 'dec', grupo: 'mercado' },
 ];
 
+// Aba fundamentalista: os anos viram colunas e os indicadores viram linhas, então aqui
+// `grupo` é o título da seção, escrito por extenso, e não uma cor de cabeçalho.
+const COLUNAS_FUND = [
+  { chave: 'dy', rotulo: 'DY %', tipo: 'pct1', grupo: 'Valuation' },
+  { chave: 'lpa', rotulo: 'LPA', tipo: 'dec', grupo: 'Valuation' },
+  { chave: 'ppa', rotulo: 'PPA', tipo: 'dec', grupo: 'Valuation' },
+  { chave: 'precoLucro', rotulo: 'P/L', tipo: 'dec', grupo: 'Valuation' },
+  { chave: 'vpa', rotulo: 'VPA', tipo: 'dec', grupo: 'Valuation' },
+  { chave: 'pvpa', rotulo: 'P/VPA', tipo: 'dec', grupo: 'Valuation' },
+  { chave: 'evEbitda', rotulo: 'EV/EBITDA', tipo: 'dec', grupo: 'Valuation' },
+  { chave: 'evEbit', rotulo: 'EV/EBIT', tipo: 'dec', grupo: 'Valuation' },
+
+  { chave: 'dlEbitda', rotulo: 'DL/EBITDA', tipo: 'x', grupo: 'Endividamento' },
+  { chave: 'dlEbit', rotulo: 'DL/EBIT', tipo: 'x', grupo: 'Endividamento' },
+  { chave: 'divida', rotulo: 'Dívida Bruta', tipo: 'mi', grupo: 'Endividamento' },
+  { chave: 'caixaEquiv', rotulo: 'Caixa', tipo: 'mi', grupo: 'Endividamento' },
+  { chave: 'dividaLiquida', rotulo: 'Dívida Líquida', tipo: 'mi', grupo: 'Endividamento' },
+
+  { chave: 'margemBruta', rotulo: 'Bruta', tipo: 'pct1', grupo: 'Eficiência · Margens %' },
+  { chave: 'margemEbitda', rotulo: 'EBITDA', tipo: 'pct1', grupo: 'Eficiência · Margens %' },
+  { chave: 'margemEbit', rotulo: 'EBIT', tipo: 'pct1', grupo: 'Eficiência · Margens %' },
+  { chave: 'margemLiquida', rotulo: 'Líquida', tipo: 'pct1', grupo: 'Eficiência · Margens %' },
+
+  { chave: 'roe', rotulo: 'ROE', tipo: 'pct1', grupo: 'Rentabilidade %' },
+  { chave: 'roa', rotulo: 'ROA', tipo: 'pct1', grupo: 'Rentabilidade %' },
+  { chave: 'roic', rotulo: 'ROIC', tipo: 'pct1', grupo: 'Rentabilidade %' },
+
+  { chave: 'cagrReceitas', rotulo: 'Receitas', tipo: 'pct1', grupo: 'Crescimento · CAGR 5 anos %' },
+  { chave: 'cagrLucros', rotulo: 'Lucros', tipo: 'pct1', grupo: 'Crescimento · CAGR 5 anos %' },
+  { chave: 'cagrDividendos', rotulo: 'Dividendos', tipo: 'pct1', grupo: 'Crescimento · CAGR 5 anos %' },
+
+  { chave: 'rta1a', rotulo: '12 meses', tipo: 'pct1', grupo: 'Retorno Total Acionista (RTA) %' },
+  { chave: 'rta3a', rotulo: '3 anos', tipo: 'pct1', grupo: 'Retorno Total Acionista (RTA) %' },
+  { chave: 'rta5a', rotulo: '5 anos', tipo: 'pct1', grupo: 'Retorno Total Acionista (RTA) %' },
+
+  { chave: 'patrimonio', rotulo: 'Patrimônio Líquido', tipo: 'mi', grupo: 'Informações adicionais' },
+  { chave: 'valorMercado', rotulo: 'Valor Mercado', tipo: 'mi', grupo: 'Informações adicionais' },
+  { chave: 'valorFirma', rotulo: 'Valor Firma', tipo: 'mi', grupo: 'Informações adicionais' },
+  { chave: 'papeis', rotulo: 'Papéis (mi)', tipo: 'mi', grupo: 'Informações adicionais' },
+];
+
 const ABAS = [
   { id: 'kpi', rotulo: 'Indicadores', colunas: COLUNAS_KPI },
   { id: 'eva', rotulo: 'EVA', colunas: COLUNAS_EVA },
+  { id: 'fund', rotulo: 'Fundamentalistas', colunas: COLUNAS_FUND, layout: 'transposta' },
 ];
 
 const MS_ANO = 365.25 * 24 * 60 * 60 * 1000;
@@ -221,11 +263,13 @@ function linhaVariacao(rotulo, modo, ini, fim, anos) {
 
 function atualizaVariacao() {
   const seletorDe = document.getElementById('empDe');
-  if (!DADOS || !seletorDe) return; // empresa com um único período: não há o que comparar
+  const rodape = document.getElementById('empRodape');
+  // sem seletor: empresa com um único período. Sem rodapé: tabela transposta, onde o
+  // período é coluna e estas duas linhas de variação não existem.
+  if (!DADOS || !seletorDe || !rodape) return;
   const linhas = DADOS.linhas;
   const iIni = Number(seletorDe.value);
   const iFim = Number(document.getElementById('empAte').value);
-  const rodape = document.getElementById('empRodape');
   const intervalo = document.getElementById('empIntervalo');
 
   linhas.forEach((_, i) => {
@@ -361,15 +405,15 @@ function ligaArrasto() {
     if (ev.target.closest('.emp-balao-x')) fechaBalao();
   });
 
-  // clique no cabeçalho abre o histórico da coluna (o arrasto só pega o corpo)
+  // Abre o histórico: pelo cabeçalho da coluna nas abas normais, pela linha na
+  // fundamentalista, onde o indicador é a linha e não a coluna.
   conteudoEl.addEventListener('click', (ev) => {
-    const th = ev.target.closest('th');
+    const linha = ev.target.closest('tr[data-ind]');
+    if (linha) return abreGrafico(Number(linha.dataset.ind));
+    // só o cabeçalho: na tabela transposta o rótulo da linha também é um <th>
+    const th = ev.target.closest('thead th');
     if (!th || !conteudoEl.contains(th)) return;
-    const i = [...th.parentElement.children].indexOf(th);
-    if (!COLUNAS()[i] || COLUNAS()[i].tipo === 'texto') return;
-    grafico.coluna = i;
-    grafico.series = grafico.series.filter((s) => s !== i); // não se compara consigo mesmo
-    renderModal();
+    return abreGrafico([...th.parentElement.children].indexOf(th));
   });
 
   modalEl.addEventListener('click', (ev) => {
@@ -867,6 +911,15 @@ function moveDica(ev) {
   return undefined;
 }
 
+function abreGrafico(i) {
+  const c = COLUNAS()[i];
+  if (!c || c.tipo === 'texto') return undefined;
+  grafico.coluna = i;
+  grafico.series = grafico.series.filter((s) => s !== i); // não se compara consigo mesmo
+  renderModal();
+  return undefined;
+}
+
 function fechaGrafico() {
   modalEl.hidden = true;
   modalEl.innerHTML = '';
@@ -904,6 +957,9 @@ function trocaAba(nova) {
   conteudoEl.innerHTML = renderTabela(DADOS);
   atualizaVariacao();
   renderGaleria(); // a barra é filtrada pela aba
+  // De/Até e o rodapé de variação pressupõem períodos em linhas: na tabela transposta
+  // o período é a coluna, e arrastar ou marcar duas pontas não teria o mesmo sentido
+  controlesEl.hidden = Boolean(ABA.layout);
 }
 
 // ---- Galeria de gráficos ----
@@ -1080,7 +1136,39 @@ function renderControles(linhas) {
   controlesEl.hidden = false;
 }
 
+// Aba fundamentalista: anos em colunas, do mais recente para o mais antigo, e um
+// indicador por linha. Clicar na linha abre o mesmo gráfico das outras abas.
+function renderTabelaTransposta(dados) {
+  const periodos = [...dados.linhas].reverse();
+  const cabecalho = periodos.map((l) => `<th class="g-ano">${esc(rotuloCurto(l))}</th>`).join('');
+  let grupo = null;
+  const corpo = COLUNAS().map((c, i) => {
+    let titulo = '';
+    if (c.grupo !== grupo) {
+      grupo = c.grupo;
+      // o span fixo mantém o título da seção à vista mesmo com a tabela rolada
+      titulo = `<tr class="emp-grupo"><td colspan="${periodos.length + 1}"><span>${esc(c.grupo)}</span></td></tr>`;
+    }
+    const celulas = periodos.map((l) => {
+      const valor = l[c.chave];
+      const negativo = typeof valor === 'number' && valor < 0;
+      return `<td class="emp-num${negativo ? ' neg' : ''}">${formata(valor, c.tipo)}</td>`;
+    }).join('');
+    return `${titulo}<tr data-ind="${i}">
+      <th scope="row" class="emp-ind emp-th-hist" title="ver histórico de ${esc(c.rotulo)}">${esc(c.rotulo)}</th>
+      ${celulas}
+    </tr>`;
+  }).join('');
+  return `<div class="emp-tabela-wrap">
+    <table class="emp-tabela emp-tabela-fund">
+      <thead><tr><th class="g-ano emp-ind-cabeca">Indicador</th>${cabecalho}</tr></thead>
+      <tbody>${corpo}</tbody>
+    </table>
+  </div>`;
+}
+
 function renderTabela(dados) {
+  if (ABA.layout === 'transposta') return renderTabelaTransposta(dados);
   const cabecalho = COLUNAS()
     .map((c) => {
       const clicavel = c.tipo !== 'texto';
