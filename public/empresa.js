@@ -235,9 +235,12 @@ const COLUNAS_DRE = [
   { chave: 'lucro', rotulo: 'Lucro Líquido', tipo: 'mi', nivel: 0, forte: true },
   { chave: 'margemLiquida', rotulo: 'Margem líquida', tipo: 'pct1', nivel: 1 },
   { chave: 'lucro10y', rotulo: 'Lucro líquido · média 10 anos', tipo: 'mi', nivel: 1 },
-  // Não vira linha da tabela (o número já aparece na faixa da seção), mas existe como
-  // coluna para o gráfico da faixa e para a lista de "comparar com".
+  // Não viram linha da tabela — o número já aparece na faixa da seção — mas existem como
+  // coluna para o gráfico da faixa e para a lista de "comparar com". A faixa acha o que
+  // plotar procurando a chave aqui: sem a entrada, ela fica sem clique.
   { chave: 'despesasOper', rotulo: 'Despesas operacionais (total)', tipo: 'mi', oculta: true },
+  { chave: 'ebit', rotulo: 'EBIT', tipo: 'mi', oculta: true },
+  { chave: 'resFin', rotulo: 'Resultado Financeiro', tipo: 'mi', oculta: true },
 ];
 
 const ABAS = [
