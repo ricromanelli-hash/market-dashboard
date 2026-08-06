@@ -1653,10 +1653,12 @@ body.emp-arrastando { user-select: none; }
 .emp-tabela-fund tr.emp-linha-forte th.emp-ind { border-top: 1px solid var(--border); }
 .emp-tabela-fund th.emp-ind-cabeca { z-index: 3; }
 
+/* faixa mais fechada que o realce do hover e que o verde claro dos subtotais, senão
+   as três coisas se confundem na mesma tabela */
 .emp-tabela-fund tr.emp-grupo td {
-  background: #eef4ef;
-  border-bottom: 1px solid var(--border);
-  border-top: 1px solid var(--border);
+  background: #d7e3d9;
+  border-bottom: 1px solid #c2d2c5;
+  border-top: 1px solid #c2d2c5;
   padding: 0;
 }
 /* o span acompanha a rolagem horizontal: sem isso o título some ao rolar para 2015 */
@@ -1683,6 +1685,9 @@ body.emp-arrastando { user-select: none; }
 
 /* o arrasto continua por cima: durante a seleção o azul é que informa */
 .emp-tabela tbody tr:hover td.emp-arrasto { background: #dbe9f5; }
+
+/* a faixa de seção não é dado: não acende, senão pareceria selecionável */
+.emp-tabela-fund tbody tr.emp-grupo:hover td { background: #d7e3d9; }
 
 .emp-aviso {
   margin: 20px;
