@@ -408,23 +408,32 @@ const COLUNAS_DFC = [
   { chave: 'fcoSobreLl', rotulo: 'FCO / Lucro Líquido', tipo: 'pct1', nivel: 1 },
   { chave: 'capexSobreLl', rotulo: 'Capex / Lucro Líquido', tipo: 'pct1', nivel: 1 },
 
-  // Caminho do fluxo para a firma até o fluxo para o acionista. A faixa carrega o FCFE,
-  // que é onde o bloco desemboca; as linhas mostram de onde ele sai.
+  // Cascata do EBIT até o caixa gerado, no formato de valuation aplicado ao histórico:
+  // cada subtotal é a soma das linhas acima dele, então a coluna fecha na vertical.
   {
-    chave: 'fcff',
-    rotulo: 'FCFF · fluxo para a firma',
+    chave: 'ebit',
+    rotulo: 'EBIT',
     tipo: 'mi',
     nivel: 1,
-    grupo: 'Fluxo para a firma e para o acionista',
-    grupoTotal: { chaves: ['fcfe'], tipo: 'mi', grafico: 'fcfe' },
+    grupo: 'Geração de caixa · do EBIT ao acionista',
+    grupoTotal: { chaves: ['wfGeracao'], tipo: 'mi', grafico: 'wfGeracao' },
   },
-  { chave: 'jurosLiq', rotulo: '(−) Juros depois do imposto', tipo: 'mi', nivel: 1 },
-  { chave: 'deltaDivida', rotulo: '(+) Captação líquida de dívida', tipo: 'mi', nivel: 1 },
+  { chave: 'impostos', rotulo: '(−) Imposto de renda', tipo: 'mi', nivel: 1 },
+  { chave: 'wfNoplat', rotulo: 'NOPLAT', tipo: 'mi', nivel: 0, forte: true },
+  { chave: 'wfDeprec', rotulo: '(+) Depreciação', tipo: 'mi', nivel: 1 },
+  { chave: 'wfFclBruto', rotulo: 'Fluxo de caixa livre bruto', tipo: 'mi', nivel: 0, forte: true },
+  { chave: 'capGiro', rotulo: '(+/−) Capital de giro', tipo: 'mi', nivel: 1 },
+  { chave: 'anc', rotulo: '(−) Investimentos', tipo: 'mi', nivel: 1 },
+  { chave: 'wfFcff', rotulo: 'FCFF', tipo: 'mi', nivel: 0, forte: true, realce: true },
+  { chave: 'resFin', rotulo: 'Resultado financeiro', tipo: 'mi', nivel: 1 },
+  { chave: 'deltaDivida', rotulo: 'Dívida (+/−)', tipo: 'mi', nivel: 1 },
+  { chave: 'wfFcfeCore', rotulo: 'FCFE · core', tipo: 'mi', nivel: 0, forte: true, realce: true },
+  { chave: 'wfDividendos', rotulo: 'Dividendos', tipo: 'mi', nivel: 1 },
 
   // só para o gráfico das faixas
   { chave: 'varCaixa', rotulo: 'Variação de caixa', tipo: 'mi', oculta: true },
   { chave: 'fcl', rotulo: 'Fluxo de caixa livre (FCL)', tipo: 'mi', oculta: true },
-  { chave: 'fcfe', rotulo: 'FCFE · fluxo para o acionista', tipo: 'mi', oculta: true },
+  { chave: 'wfGeracao', rotulo: 'Geração de caixa', tipo: 'mi', oculta: true },
 ];
 
 const ABAS = [

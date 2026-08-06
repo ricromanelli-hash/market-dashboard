@@ -1671,6 +1671,20 @@ function linhaKpi(r) {
   // Se qualquer parcela faltar a soma seria menor do que o custo real, então vira nulo.
   const capm = [r.taxalivrederisco, r.erp, r.rbr, r.dif_inflacao].map(num);
   linha.keCapm = capm.every((v) => v !== null) ? pct(capm.reduce((s, v) => s + v, 0)) : null;
+  // Cascata de geração de caixa, no formato usado em valuation mas aplicada ao passado.
+  // Cada subtotal é a soma das linhas acima dele, e não um campo pronto da base: só assim
+  // a coluna fecha na vertical, que é o ponto do formato.
+  const soma = (...partes) => (partes.every((v) => typeof v === 'number')
+    ? partes.reduce((s, v) => s + v, 0)
+    : null);
+  const ebitWf = milhoes(r.ebit);
+  const impostosWf = milhoes(r.impostos);
+  linha.wfNoplat = soma(ebitWf, impostosWf); // EBIT menos IR, como no modelo
+  const daWf = milhoes(r.deprecamortiz);
+  linha.wfDeprec = daWf === null ? null : Math.abs(daWf); // entra somando
+  linha.wfFclBruto = soma(linha.wfNoplat, linha.wfDeprec);
+  linha.wfFcff = soma(linha.wfFclBruto, milhoes(r.varcgol), milhoes(r.varanc));
+  linha.wfDividendos = milhoes(r.dividendos_pagos) === null ? null : -milhoes(r.dividendos_pagos);
   // FCFF já vem pronto da base: `fcf` (o econômico, não o `fcf_contabil`) é NOPAT + invae,
   // conferido em EGIE3 e PETR4 em 2024 e 2025 — que é a definição de fluxo livre para a
   // firma, com capex e D&A embutidos na variação do ativo não circulante.
@@ -1752,6 +1766,15 @@ async function carregaIndicadores(ticker) {
     const parcelas = [linhas[i].fcff, linhas[i].jurosLiq, linhas[i].deltaDivida];
     if (parcelas.every((v) => typeof v === 'number')) {
       linhas[i].fcfe = parcelas.reduce((s, v) => s + v, 0);
+    }
+    // Continuação da cascata: do FCFF ao caixa gerado. Depende do Δ dívida, por isso vem
+    // aqui e não em linhaKpi, que enxerga um período de cada vez.
+    const nucleo = [linhas[i].wfFcff, linhas[i].resFin, linhas[i].deltaDivida];
+    if (nucleo.every((v) => typeof v === 'number')) {
+      linhas[i].wfFcfeCore = nucleo.reduce((s, v) => s + v, 0);
+      if (typeof linhas[i].wfDividendos === 'number') {
+        linhas[i].wfGeracao = linhas[i].wfFcfeCore + linhas[i].wfDividendos;
+      }
     }
   }
   return {
